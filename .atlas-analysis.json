@@ -1,0 +1,100 @@
+{
+  "projectType": "saas",
+  "projectName": "Los Guayacos Food Order System",
+  "projectDescription": "A full-stack food ordering web application for Los Guayacos restaurant, enabling customers to browse an Ecuadorian menu, create orders, manage customers, and track/dispatch orders.",
+  "theme": "almond",
+  "primaryColor": "#079ed3",
+  "lightColor": "#e3d7df",
+  "darkColor": "#c45c4c",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": ["introduction", "quickstart"]
+          },
+          {
+            "group": "Core Features",
+            "pages": [
+              "features/menu",
+              "features/orders",
+              "features/customers",
+              "features/authentication"
+            ]
+          },
+          {
+            "group": "Database",
+            "pages": [
+              "database/schema",
+              "database/setup"
+            ]
+          },
+          {
+            "group": "Deployment",
+            "pages": [
+              "deployment/environment",
+              "deployment/production"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Authentication",
+            "pages": [
+              "api-reference/auth/login",
+              "api-reference/auth/signup",
+              "api-reference/auth/logout",
+              "api-reference/auth/oauth"
+            ]
+          },
+          {
+            "group": "Orders",
+            "pages": [
+              "api-reference/orders/create",
+              "api-reference/orders/list",
+              "api-reference/orders/dispatch"
+            ]
+          },
+          {
+            "group": "Resources",
+            "pages": [
+              "api-reference/resources/customers",
+              "api-reference/resources/menu-items",
+              "api-reference/resources/menu-extras",
+              "api-reference/resources/nationalities"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Menu browsing by nationality/category with item variants",
+    "Order creation with main dishes and extra items",
+    "Customer management with phone-based identification",
+    "Order dispatch and status tracking",
+    "Authentication with email/password and OAuth support",
+    "Responsive design built with Tailwind CSS",
+    "Edge runtime API routes for low-latency responses",
+    "PostgreSQL database via Prisma ORM (Neon-compatible)"
+  ],
+  "publicApiSurface": [
+    "POST /api/auth/login",
+    "POST /api/auth/signUp",
+    "POST /api/auth/logout",
+    "GET /api/auth/oauth",
+    "POST /api/auth/refreshSession",
+    "POST /api/orders",
+    "GET /api/orders",
+    "PUT /api/orders/[orderId]/dispatch",
+    "GET /api/customers",
+    "GET /api/menu_items",
+    "GET /api/menu_extras",
+    "GET /api/nationalities"
+  ]
+}
