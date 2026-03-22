@@ -137,11 +137,14 @@ Both actions call `PUT /api/orders/{orderId}/dispatch` with the new `status_id`.
 
 ```typescript
 // PUT /api/orders/{orderId}/dispatch
+
+// Confirm (status → 5) or Cancel (status → 6)
 // Request body
-{
-  status_id: number;      // 5 for dispatched, 6 for cancelled
-  is_info_sent?: boolean; // optional, marks whether info was sent via WhatsApp
-}
+{ status_id: 5 }  // or 6 for cancel
+
+// Mark WhatsApp info as sent (keeps current status, sets is_info_sent = true)
+// Request body
+{ status_id: number; is_info_sent: true }
 
 // Response
 {

@@ -1,0 +1,103 @@
+---
+title: 'Refresh session'
+description: 'Validate and refresh the current user session using stored cookies.'
+---
+
+`POST /api/auth/refreshSession`
+
+Validates the current session by forwarding the `accessToken` and `refreshToken` cookies to the upstream auth service. If the upstream service returns new tokens, they are set as fresh cookies. The response indicates whether the session is valid and includes the authenticated user's data.
+
+This endpoint is called internally by the `useAuthSession` hook on every page load to determine authentication state.
+
+<Note>
+  This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge). The default upstream URL is `http://localhost:8080/api/v1/auth` if `AUTH_ENDPOINT` is not set.
+</Note>
+
+## Request
+
+No request body is required. The endpoint reads `accessToken` and `refreshToken` from the request cookies automatically.
+
+```
+POST /api/auth/refreshSession
+Cookie: accessToken=<token>; refreshToken=<token>
+```
+
+## Response fields
+
+<ResponseField name="valid" type="boolean">
+  `true` if the session is valid, `false` if validation failed.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  Present only on failure. A human-readable description of why validation failed.
+</ResponseField>
+
+<ResponseField name="details" type="object">
+  Additional data forwarded from the upstream auth service on success (e.g. user profile). Shape depends on your auth backend.
+</ResponseField>
+
+## Cookie behaviour
+
+If the upstream auth service returns new tokens in its response (under `data.tokens` or `tokens`), the following cookies are refreshed:
+
+| Cookie | Max age | Attributes |
+|---|---|---|
+| `accessToken` | 7 days | `HttpOnly`, `SameSite=Lax`, `Path=/` |
+| `refreshToken` | 30 days | `HttpOnly`, `SameSite=Lax`, `Path=/` |
+
+Both cookies are set to `Secure` when `NODE_ENV` is `production`.
+
+## Error handling
+
+| Condition | Status | Response |
+|---|---|---|
+| No cookies present | `401` | `{ "valid": false, "message": "Missing tokens in cookies" }` |
+| Upstream validation fails | Upstream status | `{ "valid": false, "message": "Token validation failed", "details": {...} }` |
+| Upstream timeout (10s) | `500` | `{ "valid": false, "message": "Upstream request timed out" }` |
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/auth/refreshSession \
+  --cookie 'accessToken=<token>; refreshToken=<token>'
+```
+
+</CodeGroup>
+
+### Valid session response
+
+```json
+{
+  "valid": true,
+  "email": "user@example.com"
+}
+```
+
+### Invalid session response
+
+```json
+{
+  "valid": false,
+  "message": "Missing tokens in cookies"
+}
+```
+
+## Usage in the application
+
+The `useAuthSession` hook calls this endpoint automatically using SWR:
+
+```typescript
+import { useAuthSession } from "@/lib/useAuthSession";
+
+export default function MyComponent() {
+    const { isAuthenticated, userEmail, isSessionLoading } = useAuthSession();
+    // isAuthenticated: null (loading) | true | false
+    // userEmail: string | null
+    // isSessionLoading: boolean
+}
+```
+
+The hook deduplicates requests within a 30-second window and does not retry on error or revalidate on window focus. See [Authentication](/features/authentication) for full hook documentation.

@@ -164,7 +164,7 @@ The central model of the system. Each order has a unique human-readable code, be
 </ResponseField>
 
 <ResponseField name="order_code" type="String" required>
-  Unique, human-readable order identifier (e.g. `ORD-1042`). Generated at order creation.
+  Unique order identifier generated at creation time using the format `ORD-BRI{timestamp}` (e.g. `ORD-BRI1718000000000`).
 </ResponseField>
 
 <ResponseField name="customer_id" type="Int?">

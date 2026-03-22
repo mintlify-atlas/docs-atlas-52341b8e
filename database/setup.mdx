@@ -74,11 +74,11 @@ DATABASE_URL="postgresql://postgres:[password]@[host].railway.app:[port]/railway
     This command reads `lib/prisma/schema.prisma` and generates the type-safe Prisma client into `node_modules/@prisma/client`. Run it whenever the schema changes.
 
     ```bash
-    npx prisma generate
+    npx prisma generate --schema ./lib
     ```
 
     <Note>
-      The project `build` script (`prisma generate --schema ./lib && next build`) runs this automatically during production builds.
+      The project `build` script (`prisma generate --schema ./lib && next build`) runs this step automatically during production builds. The `--schema ./lib` flag is required because the schema lives at `lib/prisma/schema.prisma` rather than the default `prisma/schema.prisma`.
     </Note>
   </Step>
 
@@ -86,7 +86,7 @@ DATABASE_URL="postgresql://postgres:[password]@[host].railway.app:[port]/railway
     Creates all tables in your database to match the current schema. This is the recommended command for development and initial deployments.
 
     ```bash
-    npx prisma db push
+    npx prisma db push --schema ./lib
     ```
 
     `db push` does not create migration files. For production environments where you need a migration history, use `npx prisma migrate deploy` instead.
@@ -111,7 +111,7 @@ DATABASE_URL="postgresql://postgres:[password]@[host].railway.app:[port]/railway
     Prisma Studio provides a browser-based GUI for browsing and editing data. It is useful for verifying that seeding was successful.
 
     ```bash
-    npx prisma studio
+    npx prisma studio --schema ./lib
     ```
 
     Studio opens at `http://localhost:5555` by default.

@@ -56,16 +56,11 @@ yarn install
 
 <Step title="Configure environment variables">
 
-Create a `.env` file in the project root:
-
-```bash
-cp .env.example .env
-```
-
-If there is no `.env.example`, create `.env` manually and add the following variable:
+Create a `.env` file in the project root and add the following variables:
 
 ```env .env
 DATABASE_URL="postgresql://username:password@localhost:5432/food_orders?schema=public"
+AUTH_ENDPOINT="http://localhost:8080/api/v1/auth"
 ```
 
 Replace the value with the connection string for your database:
@@ -88,17 +83,17 @@ Replace the value with the connection string for your database:
 Run the following commands in order:
 
 ```bash
-# Generate the Prisma client from schema.prisma
-npx prisma generate
+# Generate the Prisma client from lib/prisma/schema.prisma
+npx prisma generate --schema ./lib
 
 # Push the schema to your database (creates all tables)
-npx prisma db push
+npx prisma db push --schema ./lib
 ```
 
 `prisma db push` applies your schema directly without creating migration files. It is the fastest way to get a working database during development.
 
 <Tip>
-  To inspect your data in a visual browser interface, run `npx prisma studio` and open `http://localhost:5555`. This is useful for verifying that tables were created correctly or for seeding initial records.
+  To inspect your data in a visual browser interface, run `npx prisma studio --schema ./lib` and open `http://localhost:5555`. This is useful for verifying that tables were created correctly or for seeding initial records.
 </Tip>
 
 </Step>
@@ -133,7 +128,7 @@ Open `http://localhost:3000` in your browser. You will see the Los Guayacos land
 2. Click **Start Ordering** to open the order creation form at `/new_order`.
 3. In the order form, select a customer (or create one), choose dish variants, add any extras, and submit.
 4. The order is saved to your database and assigned a unique `order_code`.
-5. From the orders dashboard, you can view the order status and dispatch it using the **Dispatch** action, which calls `POST /api/orders/[orderId]/dispatch`.
+5. From the orders dashboard, you can view the order status and dispatch it using the **Dispatch** action, which calls `PUT /api/orders/[orderId]/dispatch`.
 
 <Note>
   The menu and nationality data are seeded by your database records. If the menu is empty, use Prisma Studio (`npx prisma studio`) to add a `Nationality`, a `MenuItems` record, and at least one `ItemVariant` to see them appear in the UI.

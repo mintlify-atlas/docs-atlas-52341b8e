@@ -77,20 +77,23 @@ app/
 ├── layout.tsx            # Root layout — fonts, header, footer, metadata
 ├── menu/                 # Public menu browsing
 ├── new_order/            # Order creation flow
+├── orders/               # Protected orders dashboard
+├── login/                # Email/password and OAuth login
+├── signup/               # New user registration
 └── api/
-    ├── auth/             # login, signUp
+    ├── auth/             # login, signUp, logout, oauth, refreshSession
     ├── orders/           # create, list, dispatch
     ├── customers/
-    ├── dishes/
-    ├── nationalities/
-    └── sides/
+    ├── menu_items/
+    ├── menu_extras/
+    └── nationalities/
 
 lib/
 └── prisma/
     └── schema.prisma     # Single source of truth for all data models
 ```
 
-**Prisma** generates a fully-typed client from `schema.prisma`. The schema defines eight models: `Customer`, `Order`, `OrderItems`, `OrderItemExtras`, `MenuItems`, `ItemVariant`, `MenuExtras`, `Nationality`, and `Status`. All cascade deletes and relations are declared in the schema, so the database enforces referential integrity.
+**Prisma** generates a fully-typed client from `schema.prisma`. The schema defines nine models: `Customer`, `Order`, `OrderItems`, `OrderItemExtras`, `MenuItems`, `ItemVariant`, `MenuExtras`, `Nationality`, and `Status`. All cascade deletes and relations are declared in the schema, so the database enforces referential integrity.
 
 The `@prisma/adapter-neon` package replaces the standard Prisma TCP connection with a WebSocket-based driver compatible with Edge runtimes, enabling deployment to Vercel Edge Functions or Cloudflare Pages without connection pool issues.
 

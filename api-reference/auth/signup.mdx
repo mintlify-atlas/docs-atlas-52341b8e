@@ -1,11 +1,15 @@
 ---
 title: 'Sign up'
-description: 'Check whether the sign-up route is operational.'
+description: 'Health-check endpoint for the sign-up route. User registration is handled client-side via the upstream auth service.'
 ---
 
 `GET /api/auth/signUp`
 
-A health-check endpoint for the sign-up route. It confirms the route is reachable and returns a status message. User registration is handled by the upstream auth service; this endpoint does not accept registration data.
+This route is a health-check that confirms the sign-up API path is reachable. It does **not** accept or process registration data.
+
+<Note>
+  User registration is handled entirely client-side on the `/signup` page. The page collects name, email, password, and password confirmation, validates them locally, then calls the upstream auth service directly via `AUTH_ENDPOINT`. There is no server-side proxy route for registration in this application.
+</Note>
 
 <Note>
   This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge).
@@ -18,7 +22,7 @@ No request body or query parameters are required.
 ## Response fields
 
 <ResponseField name="message" type="string">
-  Confirmation that the sign-up route is operational.
+  Confirmation that the sign-up route is operational. Value is always `"signUp route is operational"`.
 </ResponseField>
 
 <ResponseField name="error" type="object">
@@ -51,3 +55,13 @@ curl --request GET \
   "error": {}
 }
 ```
+
+## User registration flow
+
+The actual registration flow lives in the `/signup` UI page:
+
+1. User fills in **Full Name**, **Email**, **Password**, and **Confirm Password**.
+2. Client-side validation checks that passwords match and are at least 8 characters long.
+3. On success, the user is redirected to `/new_order`.
+
+Social login (OAuth) is also available on the signup page via the `SocialLoginButtons` component. See [OAuth](/api-reference/auth/oauth) for the OAuth flow documentation.

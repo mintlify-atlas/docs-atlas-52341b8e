@@ -24,7 +24,7 @@ This endpoint does not accept query parameters. All menu items are returned in a
 </ResponseField>
 
 <ResponseField name="category_id" type="integer" required>
-  Identifier of the category this item belongs to (e.g., burgers, drinks, sides).
+  Identifier of the category this item belongs to. Not enforced as a foreign key — the category grouping is managed by the application.
 </ResponseField>
 
 <ResponseField name="name" type="string" required>
@@ -88,33 +88,33 @@ curl --request GET \
 [
   {
     "id": 1,
-    "category_id": 2,
-    "name": "Classic Burger",
-    "description": "Beef patty with lettuce, tomato, onion, and house sauce on a toasted bun.",
-    "img_url": "https://cdn.losguayacos.com/items/classic-burger.jpg",
+    "category_id": 1,
+    "name": "Seco de Pollo",
+    "description": "Traditional Ecuadorian chicken stew served with rice and salad.",
+    "img_url": "https://example.com/images/seco-de-pollo.jpg",
     "is_active": true,
     "item_variants": [
       {
         "id": 1,
         "item_id": 1,
-        "variant_name": "Single",
-        "price": 12.5,
+        "variant_name": "Regular",
+        "price": 14.0,
         "is_active": true
       },
       {
         "id": 2,
         "item_id": 1,
-        "variant_name": "Double",
-        "price": 16.0,
+        "variant_name": "Large",
+        "price": 18.0,
         "is_active": true
       }
     ]
   },
   {
     "id": 2,
-    "category_id": 4,
-    "name": "Lemonade",
-    "description": "Freshly squeezed lemonade with mint.",
+    "category_id": 1,
+    "name": "Caldo de Bola",
+    "description": "Green plantain dumpling soup with rice, egg, and vegetables.",
     "img_url": null,
     "is_active": true,
     "item_variants": [
@@ -122,7 +122,7 @@ curl --request GET \
         "id": 3,
         "item_id": 2,
         "variant_name": "Regular",
-        "price": 3.5,
+        "price": 12.0,
         "is_active": true
       }
     ]
