@@ -1,0 +1,64 @@
+---
+title: 'Logout'
+description: 'End the current user session by clearing auth cookies.'
+---
+
+`POST /api/auth/logout`
+
+Logs out the current user by expiring the `accessToken` and `refreshToken` HTTP-only cookies. The response body confirms the logout. Both `POST` and `GET` are accepted and behave identically.
+
+<Note>
+  This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge).
+</Note>
+
+## Request
+
+No request body or query parameters are required. The endpoint operates solely on the cookies set by the browser.
+
+## Response fields
+
+<ResponseField name="success" type="boolean">
+  `true` when the cookies have been cleared.
+</ResponseField>
+
+<ResponseField name="message" type="string">
+  A human-readable confirmation, e.g. `"Logged out"`.
+</ResponseField>
+
+## Cookie behaviour
+
+The following cookies are expired on every successful response:
+
+| Cookie | Attributes |
+|---|---|
+| `accessToken` | `HttpOnly`, `SameSite=Lax`, `Path=/`, `MaxAge=0` |
+| `refreshToken` | `HttpOnly`, `SameSite=Lax`, `Path=/`, `MaxAge=0` |
+
+Both cookies are set to `Secure` when `NODE_ENV` is `production`.
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL (POST)
+curl --request POST \
+  --url https://your-domain.com/api/auth/logout \
+  --cookie 'accessToken=<token>; refreshToken=<token>'
+```
+
+```bash cURL (GET)
+curl --request GET \
+  --url https://your-domain.com/api/auth/logout \
+  --cookie 'accessToken=<token>; refreshToken=<token>'
+```
+
+</CodeGroup>
+
+### Success response
+
+```json
+{
+  "success": true,
+  "message": "Logged out"
+}
+```

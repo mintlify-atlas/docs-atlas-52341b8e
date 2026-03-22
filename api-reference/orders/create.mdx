@@ -1,0 +1,189 @@
+---
+title: 'Create order'
+description: 'Create a new order with customer details, main items, and extras.'
+---
+
+`POST /api/orders`
+
+Creates a new order. If a customer with the given `phoneNumber` already exists, the order is linked to that customer. Otherwise, a new customer record is created.
+
+<Note>
+  This endpoint runs on the Edge runtime.
+</Note>
+
+## Request body
+
+<ParamField body="client" type="object" required>
+  Customer information. Used to look up or create the customer record.
+
+  <Expandable title="properties">
+    <ParamField body="client.firstName" type="string" required>
+      Customer's first name.
+    </ParamField>
+
+    <ParamField body="client.lastName" type="string" required>
+      Customer's last name.
+    </ParamField>
+
+    <ParamField body="client.phoneNumber" type="string" required>
+      Customer's phone number. Used as the unique identifier for `connectOrCreate` — if a customer with this number exists, the order is linked to them.
+    </ParamField>
+
+    <ParamField body="client.nationality" type="object | null">
+      Optional nationality reference.
+
+      <Expandable title="properties">
+        <ParamField body="client.nationality.id" type="number" required>
+          ID of the nationality record.
+        </ParamField>
+      </Expandable>
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="comments" type="string | null">
+  Optional free-text comments for the order.
+</ParamField>
+
+<ParamField body="mainItems" type="object[]" required>
+  List of main menu items in the order.
+
+  <Expandable title="properties">
+    <ParamField body="mainItems[].item_id" type="number" required>
+      ID of the menu item.
+    </ParamField>
+
+    <ParamField body="mainItems[].item_name" type="string" required>
+      Display name of the menu item.
+    </ParamField>
+
+    <ParamField body="mainItems[].variant_id" type="number" required>
+      ID of the selected item variant.
+    </ParamField>
+
+    <ParamField body="mainItems[].variant_name" type="string" required>
+      Display name of the selected variant.
+    </ParamField>
+
+    <ParamField body="mainItems[].price" type="number" required>
+      Unit price of the variant at the time of ordering.
+    </ParamField>
+
+    <ParamField body="mainItems[].quantity" type="number" required>
+      Number of units ordered.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+<ParamField body="extraItems" type="object[]" required>
+  List of extra add-on items in the order.
+
+  <Expandable title="properties">
+    <ParamField body="extraItems[].extra_id" type="number" required>
+      ID of the extra item.
+    </ParamField>
+
+    <ParamField body="extraItems[].name" type="string" required>
+      Display name of the extra item.
+    </ParamField>
+
+    <ParamField body="extraItems[].price" type="number" required>
+      Unit price of the extra at the time of ordering.
+    </ParamField>
+
+    <ParamField body="extraItems[].quantity" type="number" required>
+      Number of units ordered.
+    </ParamField>
+  </Expandable>
+</ParamField>
+
+## Response
+
+Returns the created `Order` object.
+
+<ResponseField name="id" type="number">
+  Auto-incremented order ID.
+</ResponseField>
+
+<ResponseField name="order_code" type="string">
+  Unique order code generated at creation time, in the format `ORD-BRI{timestamp}`.
+</ResponseField>
+
+<ResponseField name="customer_id" type="number | null">
+  ID of the associated customer record.
+</ResponseField>
+
+<ResponseField name="comments" type="string | null">
+  Free-text comments attached to the order.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of when the order was created.
+</ResponseField>
+
+<ResponseField name="status_id" type="number">
+  Current status ID. Defaults to `1` on creation.
+</ResponseField>
+
+<ResponseField name="is_info_sent" type="boolean">
+  Whether the order confirmation has been sent. Defaults to `false` on creation.
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/orders \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "client": {
+      "firstName": "Maria",
+      "lastName": "García",
+      "phoneNumber": "+573001234567",
+      "nationality": { "id": 2 }
+    },
+    "comments": "No onions please",
+    "mainItems": [
+      {
+        "item_id": 3,
+        "item_name": "Bandeja Paisa",
+        "variant_id": 7,
+        "variant_name": "Regular",
+        "price": 18.50,
+        "quantity": 1
+      }
+    ],
+    "extraItems": [
+      {
+        "extra_id": 5,
+        "name": "Aguacate",
+        "price": 2.00,
+        "quantity": 2
+      }
+    ]
+  }'
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+{
+  "id": 42,
+  "order_code": "ORD-BRI1711234567890",
+  "customer_id": 17,
+  "comments": "No onions please",
+  "created_at": "2026-03-22T14:05:12.000Z",
+  "status_id": 1,
+  "is_info_sent": false
+}
+```
+
+```json 500
+{
+  "error": {}
+}
+```
+
+</ResponseExample>

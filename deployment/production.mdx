@@ -1,0 +1,210 @@
+---
+title: 'Production deployment'
+description: 'Build and deploy the Los Guayacos food order system to Vercel, Cloudflare Pages, or a self-hosted Node.js server.'
+---
+
+## Build and start commands
+
+| Command | Purpose |
+|---|---|
+| `prisma generate --schema ./lib && next build` | Generates the Prisma client from `lib/prisma/schema.prisma`, then compiles the Next.js application. |
+| `next start` | Starts the production Node.js server on port 3000 (self-hosted only). |
+
+```bash
+# Build
+pnpm build
+
+# Start (self-hosted)
+pnpm start
+```
+
+The `build` script in `package.json` runs both steps in sequence:
+
+```json package.json
+"build": "prisma generate --schema ./lib && next build"
+```
+
+## Edge runtime
+
+Several API routes opt in to the edge runtime:
+
+```typescript app/api/orders/route.ts
+export const runtime = "edge";
+```
+
+This applies to at minimum:
+
+- `app/api/orders/route.ts` — order creation and listing
+- `app/api/auth/login/route.ts` — user login
+
+<Warning>
+The edge runtime does not run in a standard Node.js environment. It uses a V8-based runtime (Vercel Edge Functions or Cloudflare Workers) with a restricted API surface. The following are **not available** in edge routes:
+
+- Native Node.js modules (`fs`, `net`, `child_process`, etc.)
+- Traditional TCP database connections
+- Synchronous file I/O
+</Warning>
+
+Because of these constraints, the application uses `@prisma/adapter-neon` instead of the default Prisma engine. The Neon adapter communicates with PostgreSQL over HTTP/WebSockets, which are available in the edge runtime.
+
+```typescript lib/prisma.ts
+import { PrismaClient } from '@prisma/client'
+import { PrismaNeon } from '@prisma/adapter-neon'
+
+const connectionString = `${process.env.DATABASE_URL}`;
+const adapter = new PrismaNeon({ connectionString });
+export const prisma = new PrismaClient({ adapter });
+```
+
+<Note>
+If you add new API routes that use Prisma, keep `export const runtime = "edge"` only in routes that need low-latency globally-distributed execution. Routes without this export run in the standard Node.js Lambda runtime, where a standard Prisma engine works without the Neon adapter.
+</Note>
+
+## Database considerations
+
+Neon is the recommended database provider for this application because:
+
+- The Neon adapter is already wired in `lib/prisma.ts`
+- Neon's serverless driver communicates over HTTP, making it compatible with both edge and Node.js runtimes
+- Neon scales to zero between requests, which suits serverless deployments
+
+Other providers (Supabase, Railway, local PostgreSQL) work correctly in self-hosted deployments where API routes run in Node.js. They are **not** compatible with edge runtime routes because they require a persistent TCP connection.
+
+## Deployment options
+
+<Tabs>
+  <Tab title="Vercel">
+    Vercel is the native deployment target for Next.js. Edge runtime routes deploy as Vercel Edge Functions automatically.
+
+    <Steps>
+      <Step title="Push your repository to GitHub">
+        Vercel imports directly from GitHub, GitLab, or Bitbucket.
+      </Step>
+
+      <Step title="Import the project in Vercel">
+        Go to [vercel.com/new](https://vercel.com/new), select your repository, and click **Import**.
+      </Step>
+
+      <Step title="Configure environment variables">
+        In the **Environment Variables** section of the import wizard (or later under **Settings → Environment Variables**), add:
+
+        ```
+        DATABASE_URL=<your-neon-connection-string>
+        AUTH_ENDPOINT=<your-auth-service-url>
+        ```
+      </Step>
+
+      <Step title="Set the build command">
+        Vercel detects Next.js automatically. Confirm the build command matches:
+
+        ```bash
+        prisma generate --schema ./lib && next build
+        ```
+      </Step>
+
+      <Step title="Deploy">
+        Click **Deploy**. Vercel runs the build and makes the application available at your assigned `.vercel.app` domain.
+      </Step>
+    </Steps>
+
+    <Tip>
+      Use Vercel's **Preview Deployments** to test pull requests against a real edge environment before merging.
+    </Tip>
+  </Tab>
+
+  <Tab title="Cloudflare Pages">
+    The live demo runs on Cloudflare Pages at `preview.food-order-system.pages.dev`. Cloudflare Pages runs Next.js via the `@cloudflare/next-on-pages` adapter, and API routes with `export const runtime = "edge"` execute as Cloudflare Workers.
+
+    <Steps>
+      <Step title="Connect your repository">
+        In the Cloudflare dashboard, go to **Workers & Pages → Create → Pages**, then connect your GitHub repository.
+      </Step>
+
+      <Step title="Configure the build">
+        | Setting | Value |
+        |---|---|
+        | Framework preset | Next.js |
+        | Build command | `prisma generate --schema ./lib && next build` |
+        | Build output directory | `.next` |
+      </Step>
+
+      <Step title="Add environment variables">
+        Under **Settings → Environment variables**, add `DATABASE_URL` and `AUTH_ENDPOINT` for the **Production** environment.
+      </Step>
+
+      <Step title="Deploy">
+        Trigger a deployment. Cloudflare builds the project and deploys it to your `.pages.dev` subdomain. You can add a custom domain under **Custom domains**.
+      </Step>
+    </Steps>
+
+    <Warning>
+      Cloudflare Workers have a 128 MB memory limit and a 10 ms CPU time limit (on the free plan). Keep edge route handlers lean. Avoid loading large datasets in a single request.
+    </Warning>
+  </Tab>
+
+  <Tab title="Self-hosted">
+    Self-hosted deployments run the application as a standard Node.js server. This removes edge runtime constraints but requires you to manage infrastructure.
+
+    **Prerequisites**
+    - Node.js 18 or higher
+    - A PostgreSQL database reachable from your server
+    - A process manager such as PM2 or systemd
+
+    <Steps>
+      <Step title="Install dependencies">
+        ```bash
+        pnpm install --frozen-lockfile
+        ```
+      </Step>
+
+      <Step title="Set environment variables">
+        Create a `.env` file or export variables in your shell:
+
+        ```bash
+        export DATABASE_URL="postgresql://username:password@host:5432/food_orders?schema=public"
+        export AUTH_ENDPOINT="https://auth.yourdomain.com/api/v1/auth"
+        ```
+      </Step>
+
+      <Step title="Build the application">
+        ```bash
+        pnpm build
+        ```
+      </Step>
+
+      <Step title="Start the server">
+        ```bash
+        pnpm start
+        ```
+
+        The server listens on port 3000 by default. To change the port:
+
+        ```bash
+        pnpm start -- --port 8080
+        ```
+      </Step>
+
+      <Step title="Keep the process running">
+        Use a process manager to restart the server on crashes and after reboots:
+
+        ```bash
+        # PM2 example
+        pm2 start "pnpm start" --name food-order-system
+        pm2 save
+        pm2 startup
+        ```
+      </Step>
+    </Steps>
+
+    <Note>
+      On a self-hosted server, API routes that declare `export const runtime = "edge"` still execute correctly — Next.js falls back to the Node.js runtime when not running on Vercel or Cloudflare. The Neon adapter continues to work over HTTP/WebSockets.
+    </Note>
+  </Tab>
+</Tabs>
+
+## Performance tips
+
+- **Edge runtime** — Routes with `export const runtime = "edge"` execute at the CDN edge closest to the user. Keep these handlers stateless and avoid blocking I/O.
+- **SWR caching** — The frontend uses `swr` (`^2.4.0`) for client-side data fetching. SWR deduplicates requests and serves stale data while revalidating in the background, reducing perceived latency on list views such as orders and dishes.
+- **Prisma client generation** — The build command runs `prisma generate` before `next build`. Do not skip this step; the generated client must match the schema at build time.
+- **Database connection pooling** — For high-traffic self-hosted deployments, place a connection pooler such as PgBouncer in front of PostgreSQL. Neon provides built-in pooling via its serverless driver.

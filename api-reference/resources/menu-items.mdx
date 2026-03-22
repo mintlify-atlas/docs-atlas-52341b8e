@@ -1,0 +1,143 @@
+---
+title: 'Menu items'
+description: 'Retrieve all menu items and their available variants, including pricing and availability status.'
+---
+
+## Overview
+
+The menu items endpoint returns the full catalog of items offered at Los Guayacos. Each item includes its category, description, image, active status, and a nested array of `item_variants` — the purchasable size or preparation options with individual prices.
+
+## Endpoint
+
+```
+GET /api/menu_items
+```
+
+## Query parameters
+
+This endpoint does not accept query parameters. All menu items are returned in a single response, each with their associated variants included.
+
+## Response fields
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the menu item, auto-incremented.
+</ResponseField>
+
+<ResponseField name="category_id" type="integer" required>
+  Identifier of the category this item belongs to (e.g., burgers, drinks, sides).
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Display name of the menu item.
+</ResponseField>
+
+<ResponseField name="description" type="string" required>
+  Full description of the menu item as shown to customers.
+</ResponseField>
+
+<ResponseField name="img_url" type="string">
+  URL of the item's image. May be `null` if no image has been uploaded.
+</ResponseField>
+
+<ResponseField name="is_active" type="boolean" required>
+  Whether the item is currently available for ordering. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="item_variants" type="object[]" required>
+  List of purchasable variants for this item (e.g., sizes or preparation styles). Always included in the response.
+
+  <Expandable title="item_variants properties">
+    <ResponseField name="id" type="integer" required>
+      Unique identifier for the variant, auto-incremented.
+    </ResponseField>
+
+    <ResponseField name="item_id" type="integer" required>
+      Foreign key referencing the parent `MenuItems` record.
+    </ResponseField>
+
+    <ResponseField name="variant_name" type="string" required>
+      Label for this variant, such as `"Small"`, `"Large"`, or `"With cheese"`.
+    </ResponseField>
+
+    <ResponseField name="price" type="number" required>
+      Price of this variant in the store's currency, as a floating-point number.
+    </ResponseField>
+
+    <ResponseField name="is_active" type="boolean" required>
+      Whether this specific variant is currently available. Defaults to `true`.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+## Example request
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/menu_items
+```
+
+</RequestExample>
+
+## Example response
+
+<ResponseExample>
+
+```json 200
+[
+  {
+    "id": 1,
+    "category_id": 2,
+    "name": "Classic Burger",
+    "description": "Beef patty with lettuce, tomato, onion, and house sauce on a toasted bun.",
+    "img_url": "https://cdn.losguayacos.com/items/classic-burger.jpg",
+    "is_active": true,
+    "item_variants": [
+      {
+        "id": 1,
+        "item_id": 1,
+        "variant_name": "Single",
+        "price": 12.5,
+        "is_active": true
+      },
+      {
+        "id": 2,
+        "item_id": 1,
+        "variant_name": "Double",
+        "price": 16.0,
+        "is_active": true
+      }
+    ]
+  },
+  {
+    "id": 2,
+    "category_id": 4,
+    "name": "Lemonade",
+    "description": "Freshly squeezed lemonade with mint.",
+    "img_url": null,
+    "is_active": true,
+    "item_variants": [
+      {
+        "id": 3,
+        "item_id": 2,
+        "variant_name": "Regular",
+        "price": 3.5,
+        "is_active": true
+      }
+    ]
+  }
+]
+```
+
+```json 500
+{
+  "error": {}
+}
+```
+
+</ResponseExample>
+
+<Note>
+  Items with `is_active: false` are still returned by this endpoint. Filter on the client side if you only want to display currently available items. The same applies to individual variants — check `item_variants[].is_active` before presenting a variant as orderable.
+</Note>

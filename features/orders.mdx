@@ -1,0 +1,255 @@
+---
+title: Orders
+description: Create, track, and dispatch customer orders in Los Guayacos. Covers the full order lifecycle from placement to delivery.
+---
+
+Orders are the core transactional record in Los Guayacos. Staff place orders on behalf of customers at `/new_order`, manage them at `/orders`, and mark them dispatched when they are fulfilled.
+
+## Order creation at `/new_order`
+
+Any visitor can access `/new_order` to place an order. When a user is authenticated, additional autocomplete features are available (see [Customers](/features/customers)).
+
+<Steps>
+  <Step title="Enter customer information">
+    Fill in the customer's **phone number** (required), **first name** (required), **last name** (required), and optionally their **nationality**.
+
+    If you are logged in, typing in the phone or name fields will show matching previous customers. Selecting a suggestion fills all fields automatically.
+  </Step>
+  <Step title="Add main items">
+    Click **+ Add Main Item** to open the item picker modal. Menu items are grouped by dish name — click a dish to expand it and see its variants. Select a variant, set the quantity using the +/- controls, then click **Add**.
+
+    You can add multiple main items to a single order.
+  </Step>
+  <Step title="Add extra items">
+    Click **+ Add Extras** to open the extras modal. Use the +/- controls to set the quantity for each extra you want to include, then click **Add**.
+  </Step>
+  <Step title="Add special notes">
+    Optionally type any special instructions or allergy notes in the **Special Notes** text area.
+  </Step>
+  <Step title="Submit the order">
+    Click **Register Order**. The form is submitted to `POST /api/orders`. On success, a confirmation message is shown and all fields are reset.
+  </Step>
+</Steps>
+
+### Item picker modal
+
+The `AddMainItemModal` component displays all active menu items. Clicking a dish name expands it to show its variants as selectable cards, each with a thumbnail image and price. Only one variant can be selected at a time per modal session.
+
+```typescript
+interface SelectedVariant {
+    item_id: number;
+    item_name: string;
+    variant_id: number;
+    variant_name: string;
+    price: number;
+    quantity: number;
+}
+```
+
+### Extras picker modal
+
+The `AddExtraItemModal` component lists all active extras with individual quantity counters. Multiple extras can be selected in a single modal session.
+
+```typescript
+interface ExtraItem {
+    extra_id: number;
+    name: string;
+    price: number;
+    is_active: boolean;
+}
+```
+
+## Order code generation
+
+Every order is assigned a unique `order_code` at creation time using the format:
+
+```
+ORD-BRI{timestamp}
+```
+
+where `{timestamp}` is the result of `Date.now()` in milliseconds — for example, `ORD-BRI1718000000000`. This guarantees uniqueness without requiring a database sequence.
+
+## Order status lifecycle
+
+Orders move through statuses stored in the `Status` table. The status is tracked via `status_id` on the `Order` record.
+
+| Status ID | Meaning |
+|-----------|-------------------------------------------------------------------|
+| `1` | **Received** — the order has been placed and is pending action |
+| `5` | **Dispatched** — the order has been confirmed and fulfilled |
+| `6` | **Cancelled** — the order has been cancelled |
+
+<Note>
+  The status names come from the `Status` table in the database. The UI uses the numeric IDs directly for transitions.
+</Note>
+
+The default status when an order is created is `1` (Received), set by the Prisma schema default:
+
+```prisma
+model Order {
+  status_id Int @default(1)
+  ...
+}
+```
+
+## Viewing orders at `/orders`
+
+The orders list is a protected route — unauthenticated users are redirected to `/login`. It uses SWR for data fetching and automatically revalidates after status changes.
+
+### Filtering and search
+
+- **Search** by customer name, phone number, or dish name.
+- **Date filters**: Today, This Week, This Month, or a custom date range. Defaults to the current week (Monday–Sunday).
+
+### View modes
+
+Two display modes are available, toggled with the view mode control:
+
+<CardGroup cols={2}>
+  <Card title="Detailed" icon="layout-list">
+    Orders displayed as cards in a 3-column grid. Pending orders are sorted to the top. Each card shows customer info, items, total, and action buttons.
+  </Card>
+  <Card title="Compact" icon="list">
+    Orders displayed as a dense list. Each row can be expanded to reveal item details, extras, notes, and the creation timestamp.
+  </Card>
+</CardGroup>
+
+The view mode defaults to **Compact** on mobile and **Detailed** on desktop, and can be overridden manually.
+
+### Item summary bar
+
+Above the order list, a summary bar shows the top 10 dishes in the filtered view with their received and dispatched quantities:
+
+```
+Dish Name  [received count] | [dispatched count]
+```
+
+Cancelled orders (status `6`) are excluded from the summary.
+
+## Dispatching an order
+
+From the orders list, each pending order (status `1`) shows two action buttons:
+
+- **Confirm** (checkmark) — moves the order to status `5` (Dispatched)
+- **Cancel** (✕) — moves the order to status `6` (Cancelled)
+
+Both actions call `PUT /api/orders/{orderId}/dispatch` with the new `status_id`.
+
+```typescript
+// PUT /api/orders/{orderId}/dispatch
+// Request body
+{
+  status_id: number;      // 5 for dispatched, 6 for cancelled
+  is_info_sent?: boolean; // optional, marks whether info was sent via WhatsApp
+}
+
+// Response
+{
+  message: "Order dispatched successfully",
+  order: { /* updated Order record */ }
+}
+```
+
+### WhatsApp integration
+
+Each order row includes two WhatsApp shortcut links:
+
+- **Confirm** — opens WhatsApp with a pre-filled order confirmation message listing items, extras, and the total.
+- **Info** — opens WhatsApp with operating hours and pick-up policy information. Once sent, the `is_info_sent` flag is set on the order and the button becomes disabled to prevent duplicate messages.
+
+## API reference
+
+### `POST /api/orders`
+
+Creates a new order. Customers are created or matched by phone number via `connectOrCreate`.
+
+```typescript
+// Request body
+{
+  client: {
+    firstName: string;
+    lastName: string;
+    phoneNumber: string;
+    nationality?: { id: number };
+  };
+  mainItems: [
+    {
+      item_id: number;
+      variant_id: number;
+      variant_name: string;
+      price: number;
+      quantity: number;
+    }
+  ];
+  extraItems: [
+    {
+      extra_id: number;
+      name: string;
+      price: number;
+      quantity: number;
+    }
+  ];
+  comments?: string;
+}
+```
+
+### `GET /api/orders`
+
+Returns all orders with fully nested customer, order items (with `ItemVariant` and `MenuItem`), order item extras (with `MenuExtras`), and status.
+
+<Warning>
+  This endpoint returns all orders without pagination. For large datasets, apply client-side date filtering using the controls on the `/orders` page.
+</Warning>
+
+### `PUT /api/orders/{orderId}/dispatch`
+
+Updates the `status_id` and optionally `is_info_sent` on a single order.
+
+## Data model
+
+```prisma
+model Order {
+  id                Int               @id @default(autoincrement())
+  order_code        String            @unique
+  customer_id       Int?
+  comments          String?
+  created_at        DateTime          @default(now())
+  order_item_extras OrderItemExtras[]
+  order_items       OrderItems[]
+  status_id         Int               @default(1)
+  is_info_sent      Boolean           @default(false)
+
+  customer Customer? @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  status   Status    @relation(fields: [status_id], references: [id])
+
+  @@map("order")
+}
+
+model OrderItems {
+  id         Int   @id @default(autoincrement())
+  order_id   Int
+  variant_id Int
+  quantity   Int
+  unit_price Float
+
+  Order       Order       @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  ItemVariant ItemVariant @relation(fields: [variant_id], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderItemExtras {
+  id         Int   @id @default(autoincrement())
+  order_id   Int
+  extra_id   Int
+  quantity   Int
+  unit_price Float
+
+  Order      Order      @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  MenuExtras MenuExtras @relation(fields: [extra_id], references: [extra_id])
+
+  @@map("order_item_extras")
+}
+```
+
+Deleting an `Order` cascades to both `OrderItems` and `OrderItemExtras`.

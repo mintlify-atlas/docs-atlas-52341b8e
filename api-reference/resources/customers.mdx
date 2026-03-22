@@ -1,0 +1,93 @@
+---
+title: 'Customers'
+description: 'Retrieve the list of registered customers in the Los Guayacos system.'
+---
+
+## Overview
+
+The customers endpoint returns all registered customers, ordered alphabetically by first name. Each customer record includes personal contact details and an optional nationality association.
+
+## Endpoint
+
+```
+GET /api/customers
+```
+
+## Query parameters
+
+This endpoint does not accept query parameters. All customers are returned in a single response, sorted by `first_name` ascending.
+
+## Response fields
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the customer, auto-incremented.
+</ResponseField>
+
+<ResponseField name="first_name" type="string">
+  Customer's first name. May be `null` if not provided at registration.
+</ResponseField>
+
+<ResponseField name="last_name" type="string">
+  Customer's last name. May be `null` if not provided at registration.
+</ResponseField>
+
+<ResponseField name="phone_number" type="string" required>
+  Customer's phone number. Unique across all customers — used as the primary contact identifier.
+</ResponseField>
+
+<ResponseField name="nationality_id" type="integer">
+  Foreign key referencing a [Nationality](/api-reference/resources/nationalities) record. May be `null` if nationality was not specified.
+</ResponseField>
+
+## Example request
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/customers
+```
+
+</RequestExample>
+
+## Example response
+
+<ResponseExample>
+
+```json 200
+[
+  {
+    "id": 1,
+    "first_name": "Ana",
+    "last_name": "Martínez",
+    "phone_number": "+57 310 234 5678",
+    "nationality_id": 3
+  },
+  {
+    "id": 2,
+    "first_name": "Carlos",
+    "last_name": "Rodríguez",
+    "phone_number": "+57 315 987 6543",
+    "nationality_id": null
+  },
+  {
+    "id": 3,
+    "first_name": "Laura",
+    "last_name": null,
+    "phone_number": "+57 300 111 2233",
+    "nationality_id": 1
+  }
+]
+```
+
+```json 500
+{
+  "error": {}
+}
+```
+
+</ResponseExample>
+
+<Note>
+  `phone_number` is the only field guaranteed to be present and unique for every customer record. Use it as a stable reference when looking up a specific customer.
+</Note>

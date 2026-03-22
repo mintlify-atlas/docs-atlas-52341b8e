@@ -1,0 +1,154 @@
+---
+title: Menu
+description: Browse the Los Guayacos food menu, understand how dishes are organized, and learn how menu data is structured and fetched.
+---
+
+The menu is publicly accessible at `/menu` and displays all active dishes, their size or serving variants, and available extras. No login is required to view the menu.
+
+## How dishes are organized
+
+Each dish in the system is represented by a `MenuItems` record. A dish has a name, optional description, an optional image, and one or more `ItemVariant` records that define the available sizes or serving options.
+
+The `/menu` page renders dishes under a single **"The Mains"** section, listing each active item with its variants and prices in a classic menu layout. An optional dish image is displayed alongside each entry.
+
+### Menu item data model
+
+```typescript
+type MenuItem = {
+    id: number;
+    name: string;
+    description?: string;
+    img_url?: string;
+    item_variants: MenuVariant[];
+    is_active: boolean;
+};
+
+type MenuVariant = {
+    id: number;
+    variant_name: string;
+    price: number;
+    is_active: boolean;
+};
+```
+
+Only items and variants where `is_active` is `true` are shown to customers.
+
+## Item variants
+
+Each `MenuItems` record can have multiple `ItemVariant` rows, representing different sizes or serving options for the same dish — for example, a small and a large portion of the same meal. Variants each carry their own `variant_name` and `price`.
+
+```prisma
+model ItemVariant {
+  id           Int     @id @default(autoincrement())
+  item_id      Int
+  variant_name String
+  price        Float
+  is_active    Boolean @default(true)
+
+  MenuItem   MenuItems    @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  OrderItems OrderItems[]
+
+  @@map("item_variants")
+}
+```
+
+When a staff member adds a main item to an order, they select a specific variant (not just the dish), which determines the price recorded on the order.
+
+## Menu extras
+
+Extras are standalone add-on items available alongside any main dish — things like a fried egg, plantain chips, or a drink. They are managed separately from menu items in the `MenuExtras` table.
+
+```prisma
+model MenuExtras {
+  extra_id        Int               @id @default(autoincrement())
+  name            String
+  price           Float
+  is_active       Boolean           @default(true)
+  OrderItemExtras OrderItemExtras[]
+
+  @@map("menu_extras")
+}
+```
+
+Extras are displayed in a dedicated **"Extras"** section on the `/menu` page alongside the delivery information panel.
+
+## Browsing the menu at `/menu`
+
+The `/menu` page is a client-side rendered Next.js page. On load it fetches all menu items from the API, then renders active items and their active variants.
+
+<Steps>
+  <Step title="Page loads">
+    The browser requests `/menu`. A loading spinner is shown while data is fetched.
+  </Step>
+  <Step title="Fetch menu items">
+    The page calls `GET /api/menu_items`, which returns all `MenuItems` records with their nested `item_variants`.
+  </Step>
+  <Step title="Render the menu">
+    Active dishes are listed under **The Mains**. Each dish shows its name, description, and the prices for each active variant, with a dashed line between the variant name and price in the style of a printed menu.
+  </Step>
+  <Step title="Extras and info panels">
+    Below the mains, two panels display available extras with prices, and delivery information including operating hours and the per-km delivery fee.
+  </Step>
+</Steps>
+
+## API: fetching menu data
+
+### `GET /api/menu_items`
+
+Returns all menu items including their variants.
+
+```typescript
+// Response shape
+[
+  {
+    id: number;
+    category_id: number;
+    name: string;
+    description: string;
+    img_url: string | null;
+    is_active: boolean;
+    item_variants: [
+      {
+        id: number;
+        item_id: number;
+        variant_name: string;
+        price: number;
+        is_active: boolean;
+      }
+    ];
+  }
+]
+```
+
+### `GET /api/menu_extras`
+
+Returns all active extras used for order building.
+
+```typescript
+// Response shape
+[
+  {
+    extra_id: number;
+    name: string;
+    price: number;
+    is_active: boolean;
+  }
+]
+```
+
+<Note>
+  The menu page only filters by `is_active` on the client side. Inactive items and variants are returned by the API but not displayed.
+</Note>
+
+## Data model relationships
+
+```
+MenuItems
+  └── ItemVariant[]   (one-to-many, via item_id)
+        └── OrderItems[]  (referenced when placing orders)
+
+MenuExtras
+  └── OrderItemExtras[]  (referenced when placing orders)
+```
+
+Deleting a `MenuItems` record cascades to all its `ItemVariant` rows. Orders that reference a variant are not deleted — the variant record is retained for historical accuracy.

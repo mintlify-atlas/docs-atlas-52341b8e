@@ -1,0 +1,72 @@
+---
+title: 'Login'
+description: 'Authenticate a user with email and password.'
+---
+
+`POST /api/auth/login`
+
+Authenticates a user by proxying credentials to the upstream auth service. On success, the response contains the session data returned by the auth service.
+
+<Note>
+  This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge).
+</Note>
+
+## Request body
+
+<ParamField body="email" type="string" required>
+  The user's email address.
+</ParamField>
+
+<ParamField body="password" type="string" required>
+  The user's password.
+</ParamField>
+
+<ParamField body="name" type="string">
+  The user's display name. Optional for login.
+</ParamField>
+
+## Response fields
+
+The response body is forwarded directly from the upstream auth service. The exact shape depends on your auth backend.
+
+<ResponseField name="error" type="string">
+  Present only on failure. A human-readable error message.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/auth/login \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "email": "user@example.com",
+    "password": "secret"
+  }'
+```
+
+</CodeGroup>
+
+### Success response
+
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+  "refreshToken": "dGhpcyBpcyBhIHJlZnJlc2ggdG9rZW4...",
+  "email": "user@example.com"
+}
+```
+
+### Error response
+
+```json
+{
+  "error": "Invalid credentials"
+}
+```
+
+<Warning>
+  A `401` or `403` status is returned when credentials are invalid. The `error` field contains the message forwarded from the upstream auth service.
+</Warning>

@@ -1,0 +1,181 @@
+---
+title: Authentication
+description: How authentication works in Los Guayacos, covering email/password login, user registration, OAuth providers, and session management.
+---
+
+Los Guayacos uses a session-based authentication system backed by an external auth service configured via the `AUTH_ENDPOINT` environment variable. The application proxies all authentication requests through Next.js API routes and exposes a React hook (`useAuthSession`) for consuming session state in the UI.
+
+## Email/password login at `/login`
+
+The login page at `/login` accepts an email address and password. On submission, credentials are sent to `POST /api/auth/login`, which proxies the request to the configured auth backend.
+
+<Steps>
+  <Step title="Navigate to /login">
+    If you are already authenticated, the page detects your session and redirects you to `/` automatically.
+  </Step>
+  <Step title="Enter credentials">
+    Type your email address and password, then click **Login**.
+  </Step>
+  <Step title="Authenticate">
+    The form submits to `POST /api/auth/login`. The server forwards the credentials to the external auth service.
+  </Step>
+  <Step title="Session established">
+    On success, the auth service returns session data. The application stores the session and redirects to the home page.
+  </Step>
+</Steps>
+
+Alternatively, the login page offers social login buttons via OAuth (see [OAuth support](#oauth-support) below), and a link to `/signup` for new users.
+
+## User registration at `/signup`
+
+The signup page at `/signup` collects a full name, email address, password, and password confirmation.
+
+Client-side validation checks:
+- Passwords must match.
+- Password must be at least 8 characters long.
+
+```typescript
+const handleSignupSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (password !== confirmPassword) {
+        alert("Passwords don't match!");
+        return;
+    }
+
+    if (password.length < 8) {
+        alert("Password must be at least 8 characters long!");
+        return;
+    }
+    // ...
+};
+```
+
+After a successful signup, the user is redirected to `/new_order`.
+
+## OAuth support
+
+Social login is available via OAuth providers. The flow is handled by dynamic routes:
+
+| Route | Purpose |
+|---|---|
+| `GET /api/auth/oauth/[provider]` | Initiates the OAuth flow for the given provider |
+| `/auth/[provider]/callback/` | Handles the OAuth callback redirect from the provider |
+| `/api/auth/oauth/[provider]/callback/` | API-side callback processing |
+
+Initiating OAuth calls the external auth service at `{AUTH_ENDPOINT}/oauth/{provider}` and returns the redirect URL or authorization data to the client.
+
+```typescript
+// GET /api/auth/oauth/[provider]
+const response = await fetch(`${authUrl}/oauth/${provider}`, {
+    method: "GET",
+    headers: { "Content-Type": "application/json" },
+});
+```
+
+The `SocialLoginButtons` component on the login and signup pages renders the available OAuth provider buttons.
+
+## Session refresh
+
+The session is validated by calling `POST /api/auth/refreshSession`. This endpoint communicates with the auth backend and returns session validity information.
+
+The response is considered valid when:
+- `data.valid === true`, or
+- The response contains an `email` field at `data.email`, `data.data.email`, or `data.user.email`.
+
+```typescript
+// Session is valid if:
+const valid =
+    data?.valid === true ||
+    typeof data?.email === "string" ||
+    typeof data?.data?.email === "string";
+```
+
+The session is refreshed automatically by the `useAuthSession` hook using SWR with a 30-second deduplication window.
+
+## `useAuthSession` hook
+
+The `useAuthSession` hook provides reactive authentication state to any component in the application. Import it from `@/lib/useAuthSession`.
+
+```typescript
+import { useAuthSession } from "@/lib/useAuthSession";
+
+export default function MyComponent() {
+    const { isAuthenticated, userEmail, isSessionLoading } = useAuthSession();
+
+    // isAuthenticated: null (loading) | true | false
+    // userEmail: string | null
+    // isSessionLoading: boolean
+}
+```
+
+### Return values
+
+| Property | Type | Description |
+|---|---|---|
+| `isAuthenticated` | `null \| boolean` | `null` while loading, `true` if session is valid, `false` if not |
+| `userEmail` | `string \| null` | The authenticated user's email address, or `null` |
+| `isSessionLoading` | `boolean` | `true` while the session check is in progress |
+
+The hook uses SWR internally with the cache key `"auth-session"`. It does not retry on error and does not revalidate on window focus, making it suitable for session checks that should not trigger excessive network requests.
+
+```typescript
+export function useAuthSession() {
+    const { data, isLoading } = useSWR<AuthSession>(
+        AUTH_SESSION_KEY,
+        authSessionFetcher,
+        {
+            revalidateOnFocus: false,
+            shouldRetryOnError: false,
+            dedupingInterval: 30_000,
+        },
+    );
+
+    return {
+        isAuthenticated: isLoading ? null : (data?.isAuthenticated ?? false),
+        userEmail: data?.userEmail ?? null,
+        isSessionLoading: isLoading,
+    };
+}
+```
+
+## Protected routes
+
+The `/orders` page requires authentication. The protection logic runs inside a `useEffect`:
+
+```typescript
+const { isAuthenticated, isSessionLoading } = useAuthSession();
+
+useEffect(() => {
+    if (isAuthenticated === false) {
+        router.replace("/login");
+    }
+}, [isAuthenticated, router]);
+```
+
+While the session is loading (`isAuthenticated === null`), the page renders a loading spinner. If the session resolves to unauthenticated (`false`), the user is redirected to `/login`.
+
+<Tip>
+  The `/new_order` page is accessible to everyone, but authenticated users receive additional features such as customer autocomplete. Authentication is checked separately on that page for this reason.
+</Tip>
+
+<Warning>
+  Always check `isSessionLoading` before acting on `isAuthenticated`. Acting on `isAuthenticated` while `isSessionLoading` is `true` will use a stale or default value.
+</Warning>
+
+## Auth flow summary
+
+<CardGroup cols={2}>
+  <Card title="Email/password login" icon="mail">
+    Submit credentials to `POST /api/auth/login`. Proxied to the external auth service. Session is established on success.
+  </Card>
+  <Card title="OAuth login" icon="key">
+    Initiate via `GET /api/auth/oauth/[provider]`. The provider redirects back to the callback route to complete the flow.
+  </Card>
+  <Card title="Registration" icon="user-plus">
+    Submit name, email, and password at `/signup`. Password must be at least 8 characters and confirmed.
+  </Card>
+  <Card title="Session check" icon="shield-check">
+    `useAuthSession` calls `POST /api/auth/refreshSession` using SWR, caching the result for 30 seconds.
+  </Card>
+</CardGroup>

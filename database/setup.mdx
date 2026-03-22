@@ -1,0 +1,179 @@
+---
+title: Setup
+description: How to configure a PostgreSQL database, run Prisma migrations, and get the Los Guayacos system ready to use.
+---
+
+The Los Guayacos system uses [Prisma ORM](https://www.prisma.io/) with a PostgreSQL database. This guide walks you through picking a database provider, setting the connection string, and initialising the schema.
+
+## Supported databases
+
+Any PostgreSQL-compatible database works. The project is tested against the following providers:
+
+<Columns cols={2}>
+  <Card title="Local PostgreSQL" icon="database">
+    Run PostgreSQL locally via a system package manager or Docker. Best for development.
+  </Card>
+  <Card title="Supabase" icon="cloud">
+    Get your connection string from **Project Settings → Database → Connection String (URI)**.
+  </Card>
+  <Card title="Neon" icon="bolt">
+    Serverless PostgreSQL with edge-runtime support. Recommended for Vercel/Edge deployments. Copy the connection string from your Neon dashboard.
+  </Card>
+  <Card title="Railway" icon="train-track">
+    Copy the connection string from the PostgreSQL plugin settings inside your Railway project.
+  </Card>
+</Columns>
+
+## Environment variable
+
+Prisma reads the database connection string from the `DATABASE_URL` environment variable. Create a `.env` file in the project root:
+
+```env .env
+DATABASE_URL="postgresql://username:password@host:5432/database_name?schema=public"
+```
+
+<CodeGroup>
+
+```env Local
+DATABASE_URL="postgresql://postgres:password@localhost:5432/food_orders?schema=public"
+```
+
+```env Supabase
+# From: Project Settings → Database → Connection String (URI)
+DATABASE_URL="postgresql://postgres:[YOUR-PASSWORD]@db.[PROJECT-REF].supabase.co:5432/postgres"
+```
+
+```env Neon
+# From your Neon dashboard
+DATABASE_URL="postgresql://[user]:[password]@[host].neon.tech/[dbname]?sslmode=require"
+```
+
+```env Railway
+# From your Railway PostgreSQL plugin settings
+DATABASE_URL="postgresql://postgres:[password]@[host].railway.app:[port]/railway"
+```
+
+</CodeGroup>
+
+<Warning>
+  Never commit your `.env` file to source control. Add it to `.gitignore` before your first commit.
+</Warning>
+
+## Initialise the database
+
+<Steps>
+  <Step title="Install dependencies">
+    If you haven't already, install the project dependencies. Prisma CLI is included as a dev dependency.
+
+    ```bash
+    npm install
+    ```
+  </Step>
+
+  <Step title="Generate the Prisma client">
+    This command reads `lib/prisma/schema.prisma` and generates the type-safe Prisma client into `node_modules/@prisma/client`. Run it whenever the schema changes.
+
+    ```bash
+    npx prisma generate
+    ```
+
+    <Note>
+      The project `build` script (`prisma generate --schema ./lib && next build`) runs this automatically during production builds.
+    </Note>
+  </Step>
+
+  <Step title="Push the schema to the database">
+    Creates all tables in your database to match the current schema. This is the recommended command for development and initial deployments.
+
+    ```bash
+    npx prisma db push
+    ```
+
+    `db push` does not create migration files. For production environments where you need a migration history, use `npx prisma migrate deploy` instead.
+  </Step>
+
+  <Step title="Seed required lookup data">
+    Some tables must contain rows before the application will work correctly. At minimum, insert a `"Pending"` status row:
+
+    ```sql
+    INSERT INTO status (name) VALUES ('Pending');
+    INSERT INTO status (name) VALUES ('Dispatched');
+    ```
+
+    You can run these statements in Prisma Studio, your database provider's dashboard, or any SQL client.
+
+    <Warning>
+      The `Order` model defaults `status_id` to `1`. If the `status` table is empty, creating any order will fail with a foreign key violation.
+    </Warning>
+  </Step>
+
+  <Step title="(Optional) Open Prisma Studio">
+    Prisma Studio provides a browser-based GUI for browsing and editing data. It is useful for verifying that seeding was successful.
+
+    ```bash
+    npx prisma studio
+    ```
+
+    Studio opens at `http://localhost:5555` by default.
+  </Step>
+</Steps>
+
+## The Neon adapter
+
+The application uses `@prisma/adapter-neon` (`lib/prisma.ts`) instead of the standard Prisma client:
+
+```typescript lib/prisma.ts
+import { PrismaClient } from '@prisma/client'
+import { PrismaNeon } from '@prisma/adapter-neon'
+
+const connectionString = `${process.env.DATABASE_URL}`;
+
+const adapter = new PrismaNeon({ connectionString });
+export const prisma = new PrismaClient({ adapter });
+```
+
+The Neon adapter uses WebSockets and HTTP to connect to PostgreSQL, which is required when running in edge runtimes (such as Vercel Edge Functions or Cloudflare Workers). Standard Prisma uses a long-lived TCP connection that is not available in these environments.
+
+<Note>
+  If you are deploying to a traditional Node.js server rather than an edge runtime, the Neon adapter still works but is not required. You can replace it with a standard `new PrismaClient()` instance.
+</Note>
+
+## Seeding initial data
+
+Beyond the required `Status` rows, you may want to seed:
+
+| Table | Example values |
+|---|---|
+| `status` | `Pending`, `Dispatched` |
+| `nationality` | `Venezuelan`, `Colombian`, `Peruvian` |
+| `menu_items` | Your restaurant's dishes |
+| `item_variants` | `Small`, `Large`, `Regular` per dish |
+| `menu_extras` | Sauces, sides, drinks |
+
+<Tip>
+  Prisma supports a seed script via `prisma.seed` in `package.json`. Create a `prisma/seed.ts` file and add `"seed": "ts-node prisma/seed.ts"` to the `prisma` key in `package.json`. Then run it with `npx prisma db seed`.
+</Tip>
+
+## Troubleshooting
+
+<AccordionGroup>
+  <Accordion title="Error: Environment variable not found: DATABASE_URL">
+    Prisma cannot find the `.env` file or the variable is not set. Verify that `.env` exists in the project root and that `DATABASE_URL` is defined. If you're running in CI/CD, ensure the variable is injected into the environment.
+  </Accordion>
+
+  <Accordion title="Error: Foreign key constraint failed on Order.status_id">
+    The `status` table is empty. Insert at least one row with `id = 1` (or let autoincrement assign it) before creating orders. See the seeding step above.
+  </Accordion>
+
+  <Accordion title="Error: P1001 — Can't reach database server">
+    The database is not reachable. Check that the host, port, username, and password in `DATABASE_URL` are correct. For cloud providers, verify that your IP is in the database's allowlist.
+  </Accordion>
+
+  <Accordion title="Prisma client is out of date after a schema change">
+    Run `npx prisma generate` again after every schema change. If you're using TypeScript, restart your editor's language server to pick up the regenerated types.
+  </Accordion>
+
+  <Accordion title="npx prisma db push resets data I didn't expect">
+    `db push` may issue destructive SQL when resolving schema drift (e.g. dropping a column). Always check the printed SQL before confirming. In production, prefer `npx prisma migrate deploy` with versioned migration files for controlled changes.
+  </Accordion>
+</AccordionGroup>

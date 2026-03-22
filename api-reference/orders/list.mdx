@@ -1,0 +1,297 @@
+---
+title: 'List orders'
+description: 'Retrieve all orders with customer info, items, extras, and status.'
+---
+
+`GET /api/orders`
+
+Returns all orders in the system, with full details including customer information, ordered items with their variant and menu item details, extra add-ons, and the current order status.
+
+<Note>
+  This endpoint runs on the Edge runtime. No query parameters are supported — all orders are returned.
+</Note>
+
+## Response
+
+Returns an array of order objects.
+
+<ResponseField name="id" type="number">
+  Auto-incremented order ID.
+</ResponseField>
+
+<ResponseField name="order_code" type="string">
+  Unique order code in the format `ORD-BRI{timestamp}`.
+</ResponseField>
+
+<ResponseField name="customer_id" type="number | null">
+  ID of the associated customer.
+</ResponseField>
+
+<ResponseField name="comments" type="string | null">
+  Free-text comments attached to the order.
+</ResponseField>
+
+<ResponseField name="created_at" type="string">
+  ISO 8601 timestamp of order creation.
+</ResponseField>
+
+<ResponseField name="status_id" type="number">
+  ID of the current order status.
+</ResponseField>
+
+<ResponseField name="is_info_sent" type="boolean">
+  Whether order confirmation has been sent to the customer.
+</ResponseField>
+
+<ResponseField name="customer" type="object | null">
+  The customer who placed the order.
+
+  <Expandable title="properties">
+    <ResponseField name="customer.id" type="number">
+      Customer ID.
+    </ResponseField>
+
+    <ResponseField name="customer.first_name" type="string | null">
+      Customer's first name.
+    </ResponseField>
+
+    <ResponseField name="customer.last_name" type="string | null">
+      Customer's last name.
+    </ResponseField>
+
+    <ResponseField name="customer.phone_number" type="string">
+      Customer's phone number (unique identifier).
+    </ResponseField>
+
+    <ResponseField name="customer.nationality_id" type="number | null">
+      ID of the customer's nationality.
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="order_items" type="object[]">
+  Main menu items included in the order.
+
+  <Expandable title="properties">
+    <ResponseField name="order_items[].id" type="number">
+      Order item record ID.
+    </ResponseField>
+
+    <ResponseField name="order_items[].order_id" type="number">
+      ID of the parent order.
+    </ResponseField>
+
+    <ResponseField name="order_items[].variant_id" type="number">
+      ID of the ordered item variant.
+    </ResponseField>
+
+    <ResponseField name="order_items[].quantity" type="number">
+      Number of units ordered.
+    </ResponseField>
+
+    <ResponseField name="order_items[].unit_price" type="number">
+      Unit price at the time of ordering.
+    </ResponseField>
+
+    <ResponseField name="order_items[].ItemVariant" type="object">
+      The variant that was ordered.
+
+      <Expandable title="properties">
+        <ResponseField name="order_items[].ItemVariant.id" type="number">
+          Variant ID.
+        </ResponseField>
+
+        <ResponseField name="order_items[].ItemVariant.item_id" type="number">
+          ID of the parent menu item.
+        </ResponseField>
+
+        <ResponseField name="order_items[].ItemVariant.variant_name" type="string">
+          Display name of the variant (e.g., "Regular", "Large").
+        </ResponseField>
+
+        <ResponseField name="order_items[].ItemVariant.price" type="number">
+          Current listed price of the variant.
+        </ResponseField>
+
+        <ResponseField name="order_items[].ItemVariant.is_active" type="boolean">
+          Whether the variant is currently available.
+        </ResponseField>
+
+        <ResponseField name="order_items[].ItemVariant.MenuItem" type="object">
+          The parent menu item.
+
+          <Expandable title="properties">
+            <ResponseField name="order_items[].ItemVariant.MenuItem.id" type="number">
+              Menu item ID.
+            </ResponseField>
+
+            <ResponseField name="order_items[].ItemVariant.MenuItem.name" type="string">
+              Menu item name.
+            </ResponseField>
+
+            <ResponseField name="order_items[].ItemVariant.MenuItem.description" type="string">
+              Menu item description.
+            </ResponseField>
+
+            <ResponseField name="order_items[].ItemVariant.MenuItem.category_id" type="number">
+              ID of the menu category.
+            </ResponseField>
+
+            <ResponseField name="order_items[].ItemVariant.MenuItem.img_url" type="string | null">
+              URL of the item image.
+            </ResponseField>
+
+            <ResponseField name="order_items[].ItemVariant.MenuItem.is_active" type="boolean">
+              Whether the menu item is currently available.
+            </ResponseField>
+          </Expandable>
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="order_item_extras" type="object[]">
+  Extra add-on items included in the order.
+
+  <Expandable title="properties">
+    <ResponseField name="order_item_extras[].id" type="number">
+      Order item extra record ID.
+    </ResponseField>
+
+    <ResponseField name="order_item_extras[].order_id" type="number">
+      ID of the parent order.
+    </ResponseField>
+
+    <ResponseField name="order_item_extras[].extra_id" type="number">
+      ID of the extra item.
+    </ResponseField>
+
+    <ResponseField name="order_item_extras[].quantity" type="number">
+      Number of units ordered.
+    </ResponseField>
+
+    <ResponseField name="order_item_extras[].unit_price" type="number">
+      Unit price at the time of ordering.
+    </ResponseField>
+
+    <ResponseField name="order_item_extras[].MenuExtras" type="object">
+      The extra item details.
+
+      <Expandable title="properties">
+        <ResponseField name="order_item_extras[].MenuExtras.extra_id" type="number">
+          Extra item ID.
+        </ResponseField>
+
+        <ResponseField name="order_item_extras[].MenuExtras.name" type="string">
+          Display name of the extra (e.g., "Aguacate").
+        </ResponseField>
+
+        <ResponseField name="order_item_extras[].MenuExtras.price" type="number">
+          Current listed price of the extra.
+        </ResponseField>
+
+        <ResponseField name="order_item_extras[].MenuExtras.is_active" type="boolean">
+          Whether the extra is currently available.
+        </ResponseField>
+      </Expandable>
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<ResponseField name="status" type="object">
+  The current status of the order.
+
+  <Expandable title="properties">
+    <ResponseField name="status.id" type="number">
+      Status ID.
+    </ResponseField>
+
+    <ResponseField name="status.name" type="string">
+      Status name (e.g., `"pending"`, `"dispatched"`).
+    </ResponseField>
+  </Expandable>
+</ResponseField>
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/orders
+```
+
+</RequestExample>
+
+<ResponseExample>
+
+```json 200
+[
+  {
+    "id": 42,
+    "order_code": "ORD-BRI1711234567890",
+    "customer_id": 17,
+    "comments": "No onions please",
+    "created_at": "2026-03-22T14:05:12.000Z",
+    "status_id": 2,
+    "is_info_sent": true,
+    "customer": {
+      "id": 17,
+      "first_name": "Maria",
+      "last_name": "García",
+      "phone_number": "+573001234567",
+      "nationality_id": 2
+    },
+    "order_items": [
+      {
+        "id": 101,
+        "order_id": 42,
+        "variant_id": 7,
+        "quantity": 1,
+        "unit_price": 18.50,
+        "ItemVariant": {
+          "id": 7,
+          "item_id": 3,
+          "variant_name": "Regular",
+          "price": 18.50,
+          "is_active": true,
+          "MenuItem": {
+            "id": 3,
+            "name": "Bandeja Paisa",
+            "description": "Traditional Colombian dish",
+            "category_id": 1,
+            "img_url": "https://example.com/images/bandeja.jpg",
+            "is_active": true
+          }
+        }
+      }
+    ],
+    "order_item_extras": [
+      {
+        "id": 55,
+        "order_id": 42,
+        "extra_id": 5,
+        "quantity": 2,
+        "unit_price": 2.00,
+        "MenuExtras": {
+          "extra_id": 5,
+          "name": "Aguacate",
+          "price": 2.00,
+          "is_active": true
+        }
+      }
+    ],
+    "status": {
+      "id": 2,
+      "name": "dispatched"
+    }
+  }
+]
+```
+
+```json 500
+{
+  "error": {}
+}
+```
+
+</ResponseExample>

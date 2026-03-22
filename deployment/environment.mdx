@@ -1,0 +1,135 @@
+---
+title: 'Environment variables'
+description: 'Configure environment variables for local development and production deployments of the Los Guayacos food order system.'
+---
+
+The application reads configuration from environment variables at runtime. You must create a `.env` file in the project root before running the development server or building for production.
+
+## Environment variables reference
+
+| Variable | Type | Required | Description |
+|---|---|---|---|
+| `DATABASE_URL` | `string` | Yes | PostgreSQL connection string used by Prisma and the Neon adapter. |
+| `AUTH_ENDPOINT` | `string` | Yes | Base URL of the external authentication microservice. Used by the login, logout, OAuth, and session-refresh routes. |
+| `NODE_ENV` | `string` | No | Runtime environment. Set automatically by Next.js and hosting platforms. Affects secure cookie flags and other platform behaviours. |
+
+### `DATABASE_URL`
+
+Prisma reads this variable from `lib/prisma/schema.prisma` (`datasource db`) and the Neon adapter client in `lib/prisma.ts` reads it directly at startup. The value must be a valid PostgreSQL connection string.
+
+The format is:
+
+```
+postgresql://<user>:<password>@<host>:<port>/<database>?schema=public
+```
+
+Connection string examples for common providers:
+
+<CodeGroup>
+
+```bash Local PostgreSQL
+DATABASE_URL="postgresql://username:password@localhost:5432/food_orders?schema=public"
+```
+
+```bash Neon (recommended for edge)
+# Copy from your Neon dashboard → Connection Details
+DATABASE_URL="postgresql://username:password@ep-example-123456.us-east-1.aws.neon.tech/neondb?sslmode=require"
+```
+
+```bash Supabase
+# Project Settings → Database → Connection String → URI
+DATABASE_URL="postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres"
+```
+
+```bash Railway
+# Variables tab on your Railway PostgreSQL plugin
+DATABASE_URL="postgresql://postgres:[password]@[host].railway.app:[port]/railway"
+```
+
+</CodeGroup>
+
+<Note>
+Neon is the recommended provider for production because `lib/prisma.ts` uses `@prisma/adapter-neon`, which is required for the edge runtime. See [Production deployment](/deployment/production) for details.
+</Note>
+
+### `AUTH_ENDPOINT`
+
+Several API routes proxy authentication requests to an external auth microservice:
+
+- `POST /api/auth/login` — forwards credentials to `${AUTH_ENDPOINT}/login`
+- `POST /api/auth/refreshSession` — defaults to `http://localhost:8080/api/v1/auth` if unset
+- `GET /api/auth/oauth/[provider]` and its callback — uses `AUTH_ENDPOINT` for OAuth flows
+
+Set this to the base URL of your auth service, without a trailing slash.
+
+```bash
+AUTH_ENDPOINT="https://auth.yourdomain.com/api/v1/auth"
+```
+
+For local development you can point this at a locally running auth service:
+
+```bash
+AUTH_ENDPOINT="http://localhost:8080/api/v1/auth"
+```
+
+## Creating the `.env` file
+
+<Steps>
+  <Step title="Create the file">
+    In the project root, create a file named `.env`:
+
+    ```bash
+    touch .env
+    ```
+  </Step>
+
+  <Step title="Add your variables">
+    Open `.env` and add the required variables:
+
+    ```bash .env
+    DATABASE_URL="postgresql://username:password@localhost:5432/food_orders?schema=public"
+    AUTH_ENDPOINT="http://localhost:8080/api/v1/auth"
+    ```
+  </Step>
+
+  <Step title="Verify the database connection">
+    Run the Prisma client generator to confirm the connection string is valid:
+
+    ```bash
+    npx prisma db push
+    ```
+  </Step>
+</Steps>
+
+## Never commit `.env` to version control
+
+The `.gitignore` already excludes all `.env*` files:
+
+```gitignore .gitignore
+# env files (can opt-in for committing if needed)
+.env*
+```
+
+<Warning>
+Never commit `.env` or any file containing real credentials to your repository. Anyone with access to your repository would be able to read your database password and auth service credentials.
+</Warning>
+
+Share required variable names with your team by maintaining a `.env.example` file with placeholder values instead:
+
+```bash .env.example
+DATABASE_URL="postgresql://username:password@localhost:5432/food_orders?schema=public"
+AUTH_ENDPOINT="http://localhost:8080/api/v1/auth"
+```
+
+## Development vs production
+
+| Concern | Development | Production |
+|---|---|---|
+| `DATABASE_URL` | Local PostgreSQL or any cloud provider | Neon (required for edge runtime) |
+| `AUTH_ENDPOINT` | Local auth service (`localhost:8080`) | Deployed auth service URL |
+| `NODE_ENV` | `development` (set by `next dev`) | `production` (set by `next start` or host) |
+| Secure cookies | Disabled (`secure: false`) | Enabled (`secure: true`) |
+
+<Tip>
+When deploying to Vercel or Cloudflare Pages, set environment variables in the hosting dashboard rather than uploading a `.env` file. See [Production deployment](/deployment/production) for provider-specific instructions.
+</Tip>

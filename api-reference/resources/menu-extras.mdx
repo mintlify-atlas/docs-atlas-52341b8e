@@ -1,0 +1,86 @@
+---
+title: 'Menu extras'
+description: 'Retrieve all available add-ons and extras that can be added to an order.'
+---
+
+## Overview
+
+The menu extras endpoint returns all add-ons available at Los Guayacos — items such as extra sauces, toppings, or sides that can be appended to an order. Results are sorted alphabetically by name.
+
+## Endpoint
+
+```
+GET /api/menu_extras
+```
+
+## Query parameters
+
+This endpoint does not accept query parameters. All extras are returned in a single response, sorted by `name` ascending.
+
+## Response fields
+
+<ResponseField name="extra_id" type="integer" required>
+  Unique identifier for the extra, auto-incremented. Note that this field is named `extra_id`, not `id`.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Display name of the extra, such as `"Extra Sauce"` or `"Bacon"`.
+</ResponseField>
+
+<ResponseField name="price" type="number" required>
+  Price of the extra in the store's currency, as a floating-point number.
+</ResponseField>
+
+<ResponseField name="is_active" type="boolean" required>
+  Whether this extra is currently available for ordering. Defaults to `true`.
+</ResponseField>
+
+## Example request
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/menu_extras
+```
+
+</RequestExample>
+
+## Example response
+
+<ResponseExample>
+
+```json 200
+[
+  {
+    "extra_id": 1,
+    "name": "Bacon",
+    "price": 1.5,
+    "is_active": true
+  },
+  {
+    "extra_id": 2,
+    "name": "Extra Cheese",
+    "price": 1.0,
+    "is_active": true
+  },
+  {
+    "extra_id": 3,
+    "name": "Guacamole",
+    "price": 2.0,
+    "is_active": false
+  }
+]
+```
+
+```json 500
+{
+  "error": "Failed to fetch side"
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The primary key field for extras is `extra_id`, not `id`. Use this value when referencing an extra in order requests. Extras with `is_active: false` are included in the response — filter on the client if you only want to present currently available options.
+</Note>

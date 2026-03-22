@@ -1,0 +1,76 @@
+---
+title: 'Nationalities'
+description: 'Retrieve the list of nationalities used to categorize customers.'
+---
+
+## Overview
+
+The nationalities endpoint returns a reference list of all nationalities configured in the system. This list is used when registering customers — a customer's `nationality_id` field references a record from this collection. Results are sorted alphabetically by name.
+
+## Endpoint
+
+```
+GET /api/nationalities
+```
+
+## Query parameters
+
+This endpoint does not accept query parameters. All nationality records are returned in a single response, sorted by `name` ascending.
+
+## Response fields
+
+<ResponseField name="id" type="integer" required>
+  Unique identifier for the nationality, auto-incremented.
+</ResponseField>
+
+<ResponseField name="name" type="string" required>
+  Full name of the nationality (e.g., `"Colombian"`, `"Venezuelan"`, `"Argentine"`). Unique across all records.
+</ResponseField>
+
+## Example request
+
+<RequestExample>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/nationalities
+```
+
+</RequestExample>
+
+## Example response
+
+<ResponseExample>
+
+```json 200
+[
+  {
+    "id": 3,
+    "name": "Argentine"
+  },
+  {
+    "id": 1,
+    "name": "Colombian"
+  },
+  {
+    "id": 4,
+    "name": "Peruvian"
+  },
+  {
+    "id": 2,
+    "name": "Venezuelan"
+  }
+]
+```
+
+```json 500
+{
+  "error": {}
+}
+```
+
+</ResponseExample>
+
+<Note>
+  The `id` values from this response are used as `nationality_id` on [Customer](/api-reference/resources/customers) records. Fetch this list to populate nationality selectors in registration forms.
+</Note>

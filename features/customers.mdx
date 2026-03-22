@@ -1,0 +1,156 @@
+---
+title: Customers
+description: How Los Guayacos identifies, stores, and auto-creates customer records during the order process.
+---
+
+Customers in Los Guayacos are identified by their **phone number**, which must be unique across all records. Customer records are created automatically when an order is placed — no separate customer registration step is required.
+
+## Customer fields
+
+```prisma
+model Customer {
+  id             Int     @id @default(autoincrement())
+  first_name     String?
+  last_name      String?
+  orders         Order[]
+  phone_number   String  @unique
+  nationality_id Int?
+
+  @@map("customer")
+}
+```
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `phone_number` | `String` | Yes | Unique identifier for the customer |
+| `first_name` | `String?` | No | Customer's first name |
+| `last_name` | `String?` | No | Customer's last name |
+| `nationality_id` | `Int?` | No | Foreign key to the `Nationality` table |
+
+<Note>
+  `first_name` and `last_name` are optional at the database level, but the order form marks them as required fields in the UI.
+</Note>
+
+## The `connectOrCreate` pattern
+
+When a new order is submitted, the system does not require staff to look up or pre-create a customer. Instead, the `POST /api/orders` endpoint uses Prisma's `connectOrCreate` to handle both cases in a single operation:
+
+- If a customer with the given `phone_number` **already exists**, the order is connected to the existing record.
+- If no customer with that `phone_number` exists, a **new customer is created** with the submitted name and nationality, then connected to the order.
+
+```typescript
+// From POST /api/orders
+await prisma.order.create({
+  data: {
+    customer: {
+      connectOrCreate: {
+        where: {
+          phone_number: client.phoneNumber,
+        },
+        create: {
+          first_name: client.firstName,
+          last_name: client.lastName,
+          nationality_id: client?.nationality?.id,
+          phone_number: client.phoneNumber,
+        },
+      },
+    },
+    // ... rest of order data
+  },
+});
+```
+
+This means the customer database grows organically as orders are placed, without any manual data entry step.
+
+<Warning>
+  If a returning customer's name or nationality changes between orders, the existing record is not updated — only the phone number is used for matching. The customer's stored details reflect the first order placed with that number.
+</Warning>
+
+## Autocomplete for returning customers
+
+When a staff member is authenticated, the `/new_order` page fetches the full customer list from `GET /api/customers` on load. As the staff member types in the **Phone Number** or **First Name** fields, matching customers are suggested in a dropdown.
+
+Selecting a suggestion auto-fills all customer fields:
+
+- Phone number
+- First name
+- Last name
+- Nationality
+
+```typescript
+const selectSuggestion = (customer) => {
+    setPhoneNumber(customer.phone_number);
+    setNationality({ id: customer.nationality_id });
+    setFirstname(customer.first_name || "");
+    setLastname(customer.last_name || "");
+};
+```
+
+Autocomplete is disabled for unauthenticated users. The page checks the session via `POST /api/auth/refreshSession` and only enables suggestions when `isAuthenticated` is `true`.
+
+<Tip>
+  Autocomplete is the fastest way to place repeat orders. Typing the first few digits of a returning customer's phone number immediately narrows down suggestions.
+</Tip>
+
+## Customer-nationality relationship
+
+Nationalities are stored in a separate `Nationality` table, referenced by `nationality_id` on the `Customer` record.
+
+```prisma
+model Nationality {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  @@map("nationality")
+}
+```
+
+The nationality list is fetched from `GET /api/nationalities` (sorted alphabetically) and presented as a searchable typeahead field on the order form. Selecting a nationality stores only the `id` on the customer record; the full name is resolved when displaying the customer.
+
+## Viewing customer history
+
+The `/orders` page displays the customer associated with each order, including their name and phone number. Because every `Order` record includes a nested `customer` object in the API response, staff can see each customer's contact details directly in the order list without navigating to a separate customer view.
+
+Searching on the `/orders` page matches against customer name and phone number:
+
+```typescript
+const matchesSearch =
+    customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.customer.phone_number.includes(searchTerm) ||
+    order.order_items.some((item) =>
+        item.ItemVariant.variant_name.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+```
+
+## API reference
+
+### `GET /api/customers`
+
+Returns all customers sorted alphabetically by `first_name`. Used to populate autocomplete suggestions on the order form.
+
+```typescript
+// Response shape
+[
+  {
+    id: number;
+    first_name: string | null;
+    last_name: string | null;
+    phone_number: string;
+    nationality_id: number | null;
+  }
+]
+```
+
+### `GET /api/nationalities`
+
+Returns all nationalities sorted alphabetically by name.
+
+```typescript
+// Response shape
+[
+  {
+    id: number;
+    name: string;
+  }
+]
+```

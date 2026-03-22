@@ -1,0 +1,400 @@
+---
+title: Schema
+description: Complete reference for the Los Guayacos Prisma schema, including all models, fields, and relationships.
+---
+
+The Los Guayacos database is a PostgreSQL database managed through [Prisma ORM](https://www.prisma.io/). The schema defines nine models covering customers, orders, menu items, and supporting lookup tables.
+
+## Full schema
+
+```prisma schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Customer {
+  id             Int     @id @default(autoincrement())
+  first_name     String?
+  last_name      String?
+  orders         Order[]
+  phone_number   String  @unique
+  nationality_id Int?
+
+  @@map("customer")
+}
+
+model Order {
+  id                Int               @id @default(autoincrement())
+  order_code        String            @unique
+  customer_id       Int?
+  comments          String?
+  created_at        DateTime          @default(now())
+  order_item_extras OrderItemExtras[]
+  order_items       OrderItems[]
+  status_id         Int               @default(1)
+  is_info_sent      Boolean           @default(false)
+
+  customer Customer? @relation(fields: [customer_id], references: [id], onDelete: Cascade)
+  status   Status    @relation(fields: [status_id], references: [id])
+
+  @@map("order")
+}
+
+model OrderItems {
+  id         Int   @id @default(autoincrement())
+  order_id   Int
+  variant_id Int
+  quantity   Int
+  unit_price Float
+
+  Order       Order       @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  ItemVariant ItemVariant @relation(fields: [variant_id], references: [id])
+
+  @@map("order_items")
+}
+
+model OrderItemExtras {
+  id         Int   @id @default(autoincrement())
+  order_id   Int
+  extra_id   Int
+  quantity   Int
+  unit_price Float
+
+  Order      Order      @relation(fields: [order_id], references: [id], onDelete: Cascade)
+  MenuExtras MenuExtras @relation(fields: [extra_id], references: [extra_id])
+
+  @@map("order_item_extras")
+}
+
+model MenuItems {
+  id            Int           @id @default(autoincrement())
+  category_id   Int
+  name          String
+  description   String
+  item_variants ItemVariant[]
+  img_url       String?
+  is_active     Boolean       @default(true)
+
+  @@map("menu_items")
+}
+
+model ItemVariant {
+  id           Int     @id @default(autoincrement())
+  item_id      Int
+  variant_name String
+  price        Float
+  is_active    Boolean @default(true)
+
+  MenuItem   MenuItems    @relation(fields: [item_id], references: [id], onDelete: Cascade)
+  OrderItems OrderItems[]
+
+  @@map("item_variants")
+}
+
+model MenuExtras {
+  extra_id        Int               @id @default(autoincrement())
+  name            String
+  price           Float
+  is_active       Boolean           @default(true)
+  OrderItemExtras OrderItemExtras[]
+
+  @@map("menu_extras")
+}
+
+model Nationality {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  @@map("nationality")
+}
+
+model Status {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+
+  Order Order[]
+
+  @@map("status")
+}
+```
+
+## Models
+
+### Customer
+
+Stores customer contact information. A customer is identified by their unique phone number and can have many orders.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="first_name" type="String?">
+  Customer's first name. Optional.
+</ResponseField>
+
+<ResponseField name="last_name" type="String?">
+  Customer's last name. Optional.
+</ResponseField>
+
+<ResponseField name="phone_number" type="String" required>
+  Customer's phone number. Must be unique across all customers.
+</ResponseField>
+
+<ResponseField name="nationality_id" type="Int?">
+  Optional reference to a `Nationality` record. Not enforced as a foreign key in the schema.
+</ResponseField>
+
+<ResponseField name="orders" type="Order[]">
+  All orders placed by this customer.
+</ResponseField>
+
+---
+
+### Order
+
+The central model of the system. Each order has a unique human-readable code, belongs to a customer, tracks status, and contains line items for dishes and extras.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="order_code" type="String" required>
+  Unique, human-readable order identifier (e.g. `ORD-1042`). Generated at order creation.
+</ResponseField>
+
+<ResponseField name="customer_id" type="Int?">
+  Foreign key to `Customer`. Optional — orders can be created without a customer on record.
+</ResponseField>
+
+<ResponseField name="comments" type="String?">
+  Free-text notes added by staff or the customer.
+</ResponseField>
+
+<ResponseField name="created_at" type="DateTime">
+  Timestamp set automatically when the order is created.
+</ResponseField>
+
+<ResponseField name="status_id" type="Int">
+  Foreign key to `Status`. Defaults to `1` (the first status in the table, typically "Pending").
+</ResponseField>
+
+<ResponseField name="is_info_sent" type="Boolean">
+  Tracks whether order confirmation has been dispatched to the customer. Defaults to `false`.
+</ResponseField>
+
+<ResponseField name="order_items" type="OrderItems[]">
+  Line items for menu item variants included in this order.
+</ResponseField>
+
+<ResponseField name="order_item_extras" type="OrderItemExtras[]">
+  Line items for add-on extras included in this order.
+</ResponseField>
+
+<Note>
+  Deleting a `Customer` cascades to their `Order` records. Deleting an `Order` cascades to its `OrderItems` and `OrderItemExtras`.
+</Note>
+
+---
+
+### OrderItems
+
+A join table between `Order` and `ItemVariant`. Each row represents one line item — a specific dish variant at the quantity and price captured at the time of ordering.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="order_id" type="Int" required>
+  Foreign key to `Order`.
+</ResponseField>
+
+<ResponseField name="variant_id" type="Int" required>
+  Foreign key to `ItemVariant`.
+</ResponseField>
+
+<ResponseField name="quantity" type="Int" required>
+  Number of units ordered.
+</ResponseField>
+
+<ResponseField name="unit_price" type="Float" required>
+  Price per unit at the time the order was placed. Stored here so price changes to `ItemVariant` do not affect historical orders.
+</ResponseField>
+
+---
+
+### OrderItemExtras
+
+A join table between `Order` and `MenuExtras`. Captures add-on extras per order with their quantity and price at time of ordering.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="order_id" type="Int" required>
+  Foreign key to `Order`.
+</ResponseField>
+
+<ResponseField name="extra_id" type="Int" required>
+  Foreign key to `MenuExtras`.
+</ResponseField>
+
+<ResponseField name="quantity" type="Int" required>
+  Number of units of this extra ordered.
+</ResponseField>
+
+<ResponseField name="unit_price" type="Float" required>
+  Price per unit at the time the order was placed.
+</ResponseField>
+
+---
+
+### MenuItems
+
+Represents a dish on the menu. Each item belongs to a category and can have multiple variants (e.g. small, large) defined in `ItemVariant`.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="category_id" type="Int" required>
+  Identifier for the dish category. Not enforced as a foreign key in the schema.
+</ResponseField>
+
+<ResponseField name="name" type="String" required>
+  Display name of the dish.
+</ResponseField>
+
+<ResponseField name="description" type="String" required>
+  Text description shown to customers.
+</ResponseField>
+
+<ResponseField name="img_url" type="String?">
+  URL to the dish's image. Optional.
+</ResponseField>
+
+<ResponseField name="is_active" type="Boolean">
+  Controls visibility of the item in the menu. Defaults to `true`.
+</ResponseField>
+
+<ResponseField name="item_variants" type="ItemVariant[]">
+  All size/option variants available for this dish.
+</ResponseField>
+
+---
+
+### ItemVariant
+
+Represents a purchasable size or preparation option for a `MenuItems` record (e.g. "Small", "Large", "Spicy").
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="item_id" type="Int" required>
+  Foreign key to `MenuItems`.
+</ResponseField>
+
+<ResponseField name="variant_name" type="String" required>
+  Label for this variant (e.g. `"Small"`, `"Large"`).
+</ResponseField>
+
+<ResponseField name="price" type="Float" required>
+  Current price of this variant. Historical order prices are stored in `OrderItems.unit_price`.
+</ResponseField>
+
+<ResponseField name="is_active" type="Boolean">
+  Controls availability. Defaults to `true`.
+</ResponseField>
+
+<Note>
+  Deleting a `MenuItems` record cascades to all its `ItemVariant` records.
+</Note>
+
+---
+
+### MenuExtras
+
+Add-on items that can be appended to any order, such as sauces, sides, or drinks.
+
+<ResponseField name="extra_id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="name" type="String" required>
+  Display name of the extra.
+</ResponseField>
+
+<ResponseField name="price" type="Float" required>
+  Current price of the extra.
+</ResponseField>
+
+<ResponseField name="is_active" type="Boolean">
+  Controls availability. Defaults to `true`.
+</ResponseField>
+
+---
+
+### Nationality
+
+Lookup table of nationalities. Used to categorize customers and, by extension, to filter menu items by cuisine type.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="name" type="String" required>
+  Nationality name. Must be unique.
+</ResponseField>
+
+---
+
+### Status
+
+Lookup table for order statuses. The `Order.status_id` foreign key references this table.
+
+<ResponseField name="id" type="Int">
+  Auto-incrementing primary key.
+</ResponseField>
+
+<ResponseField name="name" type="String" required>
+  Status label (e.g. `"Pending"`, `"Dispatched"`). Must be unique.
+</ResponseField>
+
+<Warning>
+  The `Status` table must be seeded before any orders can be created. At minimum, insert a `"Pending"` row — its `id` must be `1` because `Order.status_id` defaults to `1`.
+</Warning>
+
+## Relationships
+
+The diagram below describes the key relationships between models.
+
+```
+Status ──────────────────────────────────────────── Order
+                                                      │
+                                             ┌────────┴────────┐
+                                             │                 │
+                                        OrderItems      OrderItemExtras
+                                             │                 │
+                                        ItemVariant       MenuExtras
+                                             │
+                                         MenuItems
+
+Customer ────────────────────────────────── Order
+```
+
+### Key relationships explained
+
+| Relationship | Type | Details |
+|---|---|---|
+| `Customer` → `Order` | one-to-many | A customer can have many orders. Deleting a customer cascades to their orders. |
+| `Order` → `OrderItems` | one-to-many | An order contains one or more dish line items. Cascade delete applies. |
+| `Order` → `OrderItemExtras` | one-to-many | An order can contain zero or more extra line items. Cascade delete applies. |
+| `OrderItems` → `ItemVariant` | many-to-one | Each line item references a specific dish variant. |
+| `ItemVariant` → `MenuItems` | many-to-one | Each variant belongs to a parent dish. Deleting a dish cascades to its variants. |
+| `OrderItemExtras` → `MenuExtras` | many-to-one | Each extra line item references a `MenuExtras` record. |
+| `Order` → `Status` | many-to-one | Every order has a status. No cascade — statuses are permanent lookup values. |

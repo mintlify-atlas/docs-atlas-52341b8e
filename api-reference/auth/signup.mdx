@@ -1,0 +1,53 @@
+---
+title: 'Sign up'
+description: 'Check whether the sign-up route is operational.'
+---
+
+`GET /api/auth/signUp`
+
+A health-check endpoint for the sign-up route. It confirms the route is reachable and returns a status message. User registration is handled by the upstream auth service; this endpoint does not accept registration data.
+
+<Note>
+  This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge).
+</Note>
+
+## Request
+
+No request body or query parameters are required.
+
+## Response fields
+
+<ResponseField name="message" type="string">
+  Confirmation that the sign-up route is operational.
+</ResponseField>
+
+<ResponseField name="error" type="object">
+  Present only on failure. Contains the caught error details.
+</ResponseField>
+
+## Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/auth/signUp
+```
+
+</CodeGroup>
+
+### Success response
+
+```json
+{
+  "message": "signUp route is operational"
+}
+```
+
+### Error response
+
+```json
+{
+  "error": {}
+}
+```

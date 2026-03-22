@@ -1,0 +1,157 @@
+---
+title: 'OAuth'
+description: 'Start and complete an OAuth authentication flow with a third-party provider.'
+---
+
+The OAuth flow uses two endpoints:
+
+1. **Initiate** — redirect the user to the provider's consent screen.
+2. **Callback** — exchange the authorization code for session tokens.
+
+---
+
+## Initiate OAuth
+
+`GET /api/auth/oauth/{provider}`
+
+Starts the OAuth flow for the given provider by proxying a request to the upstream auth service and returning the authorization URL or redirect data.
+
+<Note>
+  This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge).
+</Note>
+
+### Path parameters
+
+<ParamField path="provider" type="string" required>
+  The OAuth provider to authenticate with (e.g. `google`, `github`).
+</ParamField>
+
+### Response fields
+
+The response is forwarded directly from the upstream auth service. It typically contains an authorization URL to redirect the user to.
+
+<ResponseField name="error" type="string">
+  Present only on failure. A human-readable error message.
+</ResponseField>
+
+### Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request GET \
+  --url https://your-domain.com/api/auth/oauth/google
+```
+
+</CodeGroup>
+
+#### Success response
+
+```json
+{
+  "url": "https://accounts.google.com/o/oauth2/auth?client_id=..."
+}
+```
+
+#### Error response
+
+```json
+{
+  "error": "Failed to start OAuth"
+}
+```
+
+---
+
+## OAuth callback
+
+`POST /api/auth/oauth/{provider}/callback`
+
+Exchanges the authorization code returned by the provider for session tokens. When the upstream auth service returns tokens, they are set as `HttpOnly` cookies.
+
+<Note>
+  This endpoint runs on the [Edge Runtime](https://nextjs.org/docs/app/api-reference/edge).
+</Note>
+
+### Path parameters
+
+<ParamField path="provider" type="string" required>
+  The OAuth provider that issued the code (e.g. `google`, `github`).
+</ParamField>
+
+### Request body
+
+<ParamField body="code" type="string" required>
+  The authorization code received from the provider's redirect.
+</ParamField>
+
+### Response fields
+
+<ResponseField name="error" type="string">
+  Present only on failure.
+</ResponseField>
+
+<ResponseField name="details" type="object">
+  Additional error information forwarded from the upstream auth service. Present only on upstream errors.
+</ResponseField>
+
+On success, the user profile data returned by the upstream auth service is included in the response body. The `tokens` field is stripped from the response and set as cookies instead.
+
+### Cookie behaviour
+
+When the upstream auth service returns tokens, the following cookies are set:
+
+| Cookie | Max age | Attributes |
+|---|---|---|
+| `accessToken` | 7 days | `HttpOnly`, `SameSite=Lax`, `Path=/` |
+| `refreshToken` | 30 days | `HttpOnly`, `SameSite=Lax`, `Path=/` |
+
+Both cookies are set to `Secure` when `NODE_ENV` is `production`.
+
+### Examples
+
+<CodeGroup>
+
+```bash cURL
+curl --request POST \
+  --url https://your-domain.com/api/auth/oauth/google/callback \
+  --header 'Content-Type: application/json' \
+  --data '{
+    "code": "4/0AX4XfWh..."
+  }'
+```
+
+</CodeGroup>
+
+#### Success response
+
+```json
+{
+  "email": "user@example.com",
+  "name": "Jane Doe"
+}
+```
+
+#### Error responses
+
+```json
+{
+  "error": "Missing or invalid code parameter"
+}
+```
+
+```json
+{
+  "error": "Invalid provider"
+}
+```
+
+```json
+{
+  "error": "Upstream request timed out"
+}
+```
+
+<Warning>
+  The callback endpoint has a 10-second timeout for requests to the upstream auth service. If the upstream does not respond in time, a `500` is returned with `"error": "Upstream request timed out"`.
+</Warning>

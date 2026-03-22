@@ -1,0 +1,99 @@
+---
+title: Introduction
+description: Learn what Los Guayacos is, what problems it solves, and how it is built.
+---
+
+**Los Guayacos** is a full-stack food ordering platform for an authentic Ecuadorian restaurant. It gives restaurant staff a single interface to manage the menu, receive and track customer orders, and dispatch them — while letting customers browse dishes and place orders online.
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Get a working local instance running in under ten minutes.
+  </Card>
+  <Card title="API Reference" icon="code" href="/api-reference/auth/login">
+    Explore every REST endpoint for orders, customers, menu items, and auth.
+  </Card>
+  <Card title="Core features" icon="utensils" href="/features/menu">
+    Deep dives into menu browsing, order creation, and customer management.
+  </Card>
+  <Card title="Database schema" icon="database" href="/database/schema">
+    Understand the Prisma data model that powers the platform.
+  </Card>
+</CardGroup>
+
+## What problem it solves
+
+Running a restaurant order system by hand — paper tickets, phone calls, or disconnected spreadsheets — leads to missed orders, incorrect extras, and no visibility into status. Los Guayacos centralises the entire flow:
+
+- Customers browse the menu and select dishes, variants, and extras in one form.
+- Staff see every incoming order in a dashboard and can dispatch them with a single action.
+- Customer records are stored and linked to orders so repeat customers are recognised automatically.
+- Authentication keeps the management interface private while the menu remains publicly browsable.
+
+## Key features
+
+<CardGroup cols={2}>
+  <Card title="Menu browsing by nationality" icon="globe">
+    Dishes are categorised by cuisine nationality, making it easy for customers to filter and discover items. Each dish supports multiple variants (e.g. small / large) with individual pricing.
+  </Card>
+  <Card title="Order creation with items and extras" icon="cart-shopping">
+    Orders are built from `OrderItems` (dish variants with quantities and unit prices) and `OrderItemExtras` (optional add-ons). Both are recorded per order for accurate billing.
+  </Card>
+  <Card title="Customer management" icon="users">
+    Customers are identified by a unique phone number. The system stores first name, last name, and nationality, and links every order to the placing customer.
+  </Card>
+  <Card title="Order dispatch and tracking" icon="truck">
+    Each order carries a status (e.g. pending, dispatched) and a unique `order_code`. Staff can dispatch orders via a dedicated API endpoint, and the `is_info_sent` flag tracks notification state.
+  </Card>
+  <Card title="Authentication" icon="lock">
+    Login and sign-up endpoints protect staff-facing features. The architecture is ready for OAuth extension.
+  </Card>
+  <Card title="Responsive design" icon="mobile">
+    The UI is built with Tailwind CSS v4 and works on desktop and mobile without a separate mobile build.
+  </Card>
+</CardGroup>
+
+## Tech stack
+
+| Layer | Technology | Notes |
+|---|---|---|
+| Framework | Next.js 15 (App Router) | React 19, file-based routing, server and client components |
+| Language | TypeScript 5 | Strict types across app, API routes, and Prisma models |
+| ORM | Prisma 6 | Schema-first, type-safe database access |
+| Database | PostgreSQL | Local or cloud (Neon, Supabase, Railway) |
+| DB adapter | `@prisma/adapter-neon` | Enables serverless / Edge-compatible Postgres connections |
+| Styling | Tailwind CSS v4 | Utility-first CSS, configured via PostCSS |
+| Data fetching | SWR 2 | Client-side revalidation for order and menu data |
+| Icons | Lucide React | Consistent icon set across the UI |
+| Package manager | pnpm | Faster installs, strict dependency isolation |
+| Runtime target | Edge (Vercel / Cloudflare Pages) | Low-latency API routes via the Neon serverless driver |
+
+## Architecture overview
+
+Los Guayacos follows the Next.js **App Router** convention. Every route is a folder under `app/`, and server-side data access goes through **API Route Handlers** (`app/api/...`) that call Prisma directly.
+
+```
+app/
+├── page.tsx              # Landing page (client component)
+├── layout.tsx            # Root layout — fonts, header, footer, metadata
+├── menu/                 # Public menu browsing
+├── new_order/            # Order creation flow
+└── api/
+    ├── auth/             # login, signUp
+    ├── orders/           # create, list, dispatch
+    ├── customers/
+    ├── dishes/
+    ├── nationalities/
+    └── sides/
+
+lib/
+└── prisma/
+    └── schema.prisma     # Single source of truth for all data models
+```
+
+**Prisma** generates a fully-typed client from `schema.prisma`. The schema defines eight models: `Customer`, `Order`, `OrderItems`, `OrderItemExtras`, `MenuItems`, `ItemVariant`, `MenuExtras`, `Nationality`, and `Status`. All cascade deletes and relations are declared in the schema, so the database enforces referential integrity.
+
+The `@prisma/adapter-neon` package replaces the standard Prisma TCP connection with a WebSocket-based driver compatible with Edge runtimes, enabling deployment to Vercel Edge Functions or Cloudflare Pages without connection pool issues.
+
+## Next steps
+
+Follow the [Quickstart](/quickstart) to clone the repository, configure your database, and run the application locally.
